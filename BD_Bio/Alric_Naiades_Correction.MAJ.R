@@ -2,7 +2,7 @@ invisible(lapply(c("data.table", "rgeos", "sp", "dplyr", "gridExtra", "lubridate
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("../../DataBase_treatment/BD_Bio")
+setwd("../DataBase_treatment/BD_Bio")
 
 #####
 Resume_graphique <- function(Alric, Naiades, Group){
@@ -68,7 +68,7 @@ Resume_graphique(Alric = Alr_Abd_Diatom, Naiades = Nai_Abd_Diatom, Group = "Diat
 # Macroinvertebrates
 
 #####
-load("Naiades_Macroinvertebrate"); source("../../Hymobio_Git/BD_Bio_scripts/Alric_Macroinvertebrate.R")
+load("Naiades_Macroinvertebrate"); source("../../Hymobio_GitHub/BD_Bio/Alric_Macroinvertebrate.R")
 
 Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
                                       sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
@@ -237,7 +237,7 @@ write.csv2(Traits_Macroinvertebrate, row.names = F, file = "FinalMAJ_Naiades.Alr
 # Fish
 
 #####
-load("Naiades_Fish"); source("../../Hymobio_Git/BD_Bio_scripts/Alric_Fish.R")
+load("Naiades_Fish"); source("../../Hymobio_GitHub/BD_Bio/Alric_Fish.R")
 Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
                              sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
 Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
@@ -353,7 +353,7 @@ Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOL
 Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
 Nai_Station <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")),]
 
-load("Naiades_Diatom"); source("../../Hymobio_Git/BD_Bio_scripts/Alric_Diatom.R")
+load("Naiades_Diatom"); source("../../Hymobio_GitHub/BD_Bio/Alric_Diatom.R")
 
 Nai_Abd_Diatom_maj <- Nai_Abd_Diatom[, NomLatin_Simple := sub("^(\\S*\\s+\\S+).*", "\\1", NomLatinAppelTaxon)][, NomLatin_Join := NomLatin_Simple]
 Nai_Abd_Diatom_maj[NomLatin_Join == "Pseudostaurosira (as", NomLatin_Join := "Fragilaria parasitica"]
