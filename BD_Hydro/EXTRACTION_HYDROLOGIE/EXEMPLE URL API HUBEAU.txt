@@ -1,0 +1,37 @@
+URL'https://hubeau.eaufrance.fr/api/v1/hydrometrie/obs_elab.csv?code_entite=W200201001&date_debut_obs_elab=1980&date_fin_obs_elab=2015&size=10000' 
+
+
+EXEMPLE EXTRACTION API ALITTUDE
+
+altitude_extraction_function <- function(point){
+  #{point} point of interest that ou want to extract altitude of BD ALTI 25m
+  
+  library("httr");library("jsonlite")
+  ##########
+  # STEP 1 : CONVERT TO THE API'S EPSG AND FIND COORDINATES OF INTEREST POINTS
+  ##########
+  point_API <- point %>%
+    st_transform(4326)
+  point_API <- as_tibble(st_coordinates(point_API))
+  query_X <- point_API$X
+  query_Y <- point_API$Y
+  
+  ##########
+  # STEP 2 : CALL API
+  ##########
+  url <- paste("https://wxs.ign.fr/calcul/alti/rest/elevation.json?lon=",query_X,"&lat=",query_Y,"&zonly=true", sep = "")
+  altitude_extract <- list()
+  iteration <- dim(point_API)[1]
+  # iteration <-30
+  for(i in 1:iteration){
+    print(paste("PROGRESS ITERATIONS --- ",i,"---", round(i / dim(point_API)[1] *100,0), "%"))
+    altitude_query <- fromJSON(url[i])
+    altitude_extract[i] <- altitude_query$elevations}
+  as_tibble( unlist(altitude_extract)) %>% rename(elevation = value) %>%
+    mutate(elevation = as.character(elevation)) %>% 
+    mutate(elevation = case_when(
+      elevation == "-99999" ~ "NA",
+      TRUE ~ elevation)) %>% 
+    mutate(elevation = as.numeric(elevation))
+}
+

@@ -1,0 +1,151 @@
+# 1] LISTE DES STATIONS TELECHARGEES VIA L'API HUBEAU
+#_____________________________________________________
+# https://hubeau.eaufrance.fr/page/api-hydrometrie
+
+liste_station_HUBEAU <-
+  read.csv2(
+    "C:/Users/bbourillon/Documents/4_Base_de_donnees_volumineuse/14_BD HYDRO/EXTRACTION_VIA_HUBEAU_20230214/list_station_HUBEAU.csv"
+  ) %>%
+  as_tibble()  %>%
+  rename(
+    CODE_SITE = code_site,
+    NAME_SITE = libelle_site,
+    CODE_STATION = code_station,
+    NAME_STATION = libelle_station,
+    TYPE_STATION = type_station,
+    X_raw = longitude_station,
+    Y_raw = latitude_station,
+    X_metres = coordonnee_x_station,
+    Y_metres = coordonnee_y_station,
+    CODE_PROJECTION = code_projection,
+    CITY = libelle_commune,
+    REGION = libelle_region,
+    DEPARTEMENT = libelle_departement,
+    QUALITE_STATION = qualification_donnees_station,
+    OPERATIONAL = en_service,
+    DATE_START = date_ouverture_station,
+    DATE_END = date_fermeture_station,
+    OBJECTIF_STATION = code_finalite_station,
+    MAJ = date_maj_station
+  ) %>%
+  dplyr::select(
+    CODE_SITE,
+    NAME_SITE,
+    CODE_STATION,
+    NAME_STATION,
+    TYPE_STATION,
+    X_raw,
+    Y_raw,
+    X_metres,
+    Y_metres,
+    CODE_PROJECTION,
+    CITY,
+    REGION,
+    DEPARTEMENT,
+    QUALITE_STATION,
+    OPERATIONAL,
+    DATE_START,
+    DATE_END,
+    OBJECTIF_STATION,
+    MAJ
+  ) %>%
+  # INFO CODE PROJECTION = https://id.eaufrance.fr/nsa/22
+  mutate(
+    EPSG = case_when(
+      CODE_PROJECTION ==  "5"  ~ 27572,
+      CODE_PROJECTION == "26" ~ 2154,
+      CODE_PROJECTION == "31" ~ 4326,
+      CODE_PROJECTION == "38" ~ 2975,
+      CODE_PROJECTION == "39" ~ 4559,
+      CODE_PROJECTION == "40" ~ 2972,
+      CODE_PROJECTION == "41" ~ 4471
+    ),
+    CRS = case_when(
+      CODE_PROJECTION ==  "5"  ~ "Lambert II Etendu",
+      CODE_PROJECTION == "26" ~ "LAMB93",
+      CODE_PROJECTION == "31" ~ "WGS84G",
+      CODE_PROJECTION == "38" ~ "RGR92 / UTM 40",
+      CODE_PROJECTION == "39" ~ "RRAF 91 / UTM 20",
+      CODE_PROJECTION == "40" ~ "RGFG95 / UTM 22",
+      CODE_PROJECTION == "41" ~ "RGM04 / UTM 38"
+    ),
+    # INFO DEFINITION STATION STANDARD : https://id.eaufrance.fr/nsa/530
+    # INFO TYPE_STATION  = https://id.eaufrance.fr/nsa/531
+    # INFO QUALITE_STATION    = https://id.eaufrance.fr/nsa/515;
+    QUALITE_NAME = case_when(
+      QUALITE_STATION ==  "12"  ~ "Douteuse",
+      QUALITE_STATION == "16" ~ "Non qualifiée",
+      QUALITE_STATION == "20" ~ "Bonne"
+    )
+  ) %>% 
+  # CROP TO FRANCE
+  filter(!(REGION %in% c("GUADELOUPE","MARTINIQUE","MAYOTTE","LA REUNION","GUYANE")))
+  
+dim(liste_station_HUBEAU)#5459   
+levels(as_factor(liste_station_HUBEAU$EPSG))
+
+#CONVERSION OF THE DIFFERENT EPSG IN 2154 LAMB93
+liste_station_HUBEAU_2154 <- liste_station_HUBEAU %>% 
+filter(EPSG %in% c("2154")) %>% 
+  st_as_sf( coords = c(X = "X_metres", Y = "Y_metres")) %>% 
+      mutate(
+    X_raw = st_coordinates(.)[,1],
+    Y_raw = st_coordinates(.)[,2]
+  )
+st_crs(liste_station_HUBEAU_2154) <-   unique(c(liste_station_HUBEAU_2154$EPSG))
+
+liste_station_HUBEAU_27582 <- liste_station_HUBEAU %>% 
+filter(EPSG %in% c("27572")) %>% 
+  st_as_sf( coords = c(X = "X_metres", Y = "Y_metres"))%>% 
+      mutate(
+    X_raw = st_coordinates(.)[,1],
+    Y_raw = st_coordinates(.)[,2]
+  )
+st_crs(liste_station_HUBEAU_27582) <- 27572
+liste_station_HUBEAU_27582_convert <- liste_station_HUBEAU_27582 %>% st_transform(2154)
+st_crs(liste_station_HUBEAU_27582_convert) <- 2154
+
+liste_station_HUBEAU_4326 <- liste_station_HUBEAU %>% 
+filter(EPSG %in% c("4326")) %>% 
+  st_as_sf( coords = c(X = "X_metres", Y = "Y_metres"))%>% 
+      mutate(
+    X_raw = st_coordinates(.)[,1],
+    Y_raw = st_coordinates(.)[,2]
+  )
+st_crs(liste_station_HUBEAU_4326) <- 4326
+liste_station_HUBEAU_4326_convert <- liste_station_HUBEAU_4326 %>% st_transform(2154)
+st_crs(liste_station_HUBEAU_4326_convert) <- 2154
+
+#COMPILATION
+liste_station_HUBEAU_2154<-
+liste_station_HUBEAU_2154 %>%  bind_rows(liste_station_HUBEAU_27582_convert) %>%  bind_rows(liste_station_HUBEAU_4326_convert)
+
+# 2] LISTE DES STATIONS EXPORTEES AVEC DES DONNEES PAR BENJAMIN RENARD (SERVEUR INRAE)
+#_____________________________________________________
+#LIEN DANS LE MAIL DU 14/02/2023
+liste_station_serveurINRAE <- list.files("C:/Users/bbourillon/Documents/4_Base_de_donnees_volumineuse/14_BD HYDRO/EXTRACTION_BENJAMIN_RENARD_20230214/export/", pattern = ".csv", full.names = TRUE, recursive = TRUE) %>% 
+  as_tibble() %>% 
+   separate(value, into = c("V1","V2"), sep = "export//", remove = TRUE) %>%  separate(V2, into = c("CODE_STATION","YEAR_TYPE"), sep = "/", remove = TRUE) %>% 
+  dplyr::select(CODE_STATION) %>% 
+  distinct() %>% 
+  mutate(CODE_STATION=as.factor(CODE_STATION), SERVEUR_INRAE = "YES") %>% 
+  rename(CODE_STATION_serveurINRAE = CODE_STATION)  
+
+dim(liste_station_serveurINRAE)#4647   
+
+#ATTENTION, APRES REGARD SUR LA DATE DE DEBUT ET DE FAIT DE CERTAINES STATIONS ET LES DONNEES DISPONIBLES PAR LE SERVEUR INRAE, LES DONNEES SONT TRES INCOMPLETE DANS LE TEMPS, PAR MESURE DE SECURITE, ET POUR EVITER DE REVENIR EN ARRIERE SUR LA DECOUPE DU RESEAU, TOUS LES NOEUDS EN FRANCE HEXAGONALE SERONT UTILISEES POUR L'ETAPE D'ACCROCHAGE, LA FILTRATION DES DONNEES SE FERA PAR LA SUITE
+
+    
+
+#JOINTURE DES DEUX LISTES
+STATION_HYDRO_selection <-
+ liste_station_HUBEAU_2154 %>%
+  left_join(liste_station_serveurINRAE, by = c("CODE_STATION" = "CODE_STATION_serveurINRAE")) %>% 
+  mutate(SERVEUR_INRAE = case_when(
+    SERVEUR_INRAE == "YES" ~ "YES",
+    TRUE ~ "NO"
+  ))
+
+dim(STATION_HYDRO_selection)#5459
+save(STATION_HYDRO_selection, file = "STATION_HYDRO_20230215.Rdata")
+
