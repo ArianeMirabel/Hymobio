@@ -162,5 +162,5 @@ return(list(Temp_laps, Temp_all))
 })
 names(Templaps) <- unique(Correspondance_station[, ID_AMOBIO_START])
 
-save(Hydrolaps, file = "HydroIndex_3612all")
+save(Templaps, file = "TempIndex_3612all")
 #####
