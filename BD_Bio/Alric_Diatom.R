@@ -1,11 +1,11 @@
 
-Alr_Names_Diatom <- fread("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/AMOBIO_DIAT_transcodage.csv")
+Alr_Names_Diatom <- fread("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/AMOBIO_DIAT_transcodage.csv")
 Alr_Names_Diatom <- Alr_Names_Diatom[,lapply(.SD, function(x) return(iconv(x, "ISO-8859-15", "UTF-8")))]
 
-Alr_Abd_Diatom <- fread("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/AMOBIO_DIAT_RLQtable.csv",
+Alr_Abd_Diatom <- fread("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/AMOBIO_DIAT_RLQtable.csv",
                        encoding="Latin-1")
 
-Alr_Traits_Diatom <- fread("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/traitf_diat.csv",
+Alr_Traits_Diatom <- fread("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/traitf_diat.csv",
                            encoding="Latin-1")
 
 Correspondance_Diatom <- function(Alric_Traits, Alric_Abd, Naiades_Abd, Naiades_Station, Abs_Nai){

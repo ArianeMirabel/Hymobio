@@ -8,14 +8,13 @@ invisible(lapply(c("EflowStats", "data.table", "lmomco", "dplyr", "lubridate", "
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro")
+setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Temp")
 
 # mean, coefficient of variation, skewness, kurtosis, autoregressive lag-one (AR(1)) correlation coefficient, amplitude, phase of the seasonal signal
 # use l-moments for the 4 first indicators
 # deseasonalize for AR(1), substract the monthly mean stremfolw to each month value.
 # Seasonality is measured using formula with sin, cas and tan
-load("Hydro_journaliere")
-load("Hydro_BioInventories_correspondance")
+fread("C:/Users/armirabel/Documents/DB/TEMPERATURE/temperature_20220712.csv")
 
 ##Cleaning data
 #####
@@ -189,110 +188,3 @@ names(Hydrolaps) <- unique(Correspondance_station[, ID_AMOBIO_START])
 
 save(Hydrolaps, file = "HydroIndex_3612all")
 #####
-
-## Plot validité données
-#####
-Plot_comp <- function(Compartment, Threshold){
-  Nstat <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])
-  Nperc <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])/sum(Pie_selection[Comp == Compartment, Eff_coverage])
-  assign(paste0("plot", substring(Compartment,1, 3), Threshold), 
-         ggplot(Pie_selection[Comp == Compartment, .(Eff_coverage, Equivalent)],aes(x = "", y = Eff_coverage, fill = Equivalent)) +
-         geom_col(color = "black") + coord_polar(theta = "y") +
-         scale_fill_brewer(palette = "Spectral", direction=-1) +
-         theme_void() + ggtitle(paste0("\n", substring(Compartment,1, 8))) +
-         labs(subtitle = paste("N(Valid Stations) =", length(Hydrolaps_valid), "\nTime filter = ", 
-                                 round(length(Hydrolaps_valid)/length(Hydrolaps)*100, 0), "%")) +
-         theme(legend.position = "none", plot.subtitle = element_text(size = 8)) ,
-         envir = parent.frame())
-}
-
-for(Tol_threshold in c(75, 95, 100)){
-  load(paste0("HydroIndex_3612_", Tol_threshold, "thresh"))
-  
-  Hydrolaps_valid <- Hydrolaps[which(unlist(lapply(Hydrolaps, is.data.frame)))]
-  Hydrolaps_miss <- Hydrolaps[which(!unlist(lapply(Hydrolaps, is.data.frame)))]
-  
-  Pie_selection <- rbind(data.table(Stations = names(Hydrolaps_valid),
-                                    Coverage = unlist(lapply(Hydrolaps_valid, ncol))),
-                         data.table(Stations = names(Hydrolaps_miss), 
-                                    Coverage = 0))
-  Cover <- data.frame(Equivalent = c("All periods", "Two periods", "Single period", "No overlap"),
-                      Coverage = c(26, 18, 10, 0))
-  Pie_selection[, Comp := gsub("\\_.*", "", Stations)][, Eff_coverage := .N, by = c("Coverage", "Comp")][, Eff_coverage_tot := .N, by = "Coverage"]
-  Pie_selection <- unique(left_join(Pie_selection, Cover, by = "Coverage")[, .(Comp, Eff_coverage, Eff_coverage_tot, Equivalent)])
-  Pie_selection[, Equivalent := factor(Equivalent, levels = c("All periods", "Two periods", "Single period", "No overlap"))]
- 
-  assign(paste0("Pgen", Tol_threshold), 
-         ggplot(unique(Pie_selection[, .(Eff_coverage_tot, Equivalent)]),aes(x = "", y = Eff_coverage_tot, fill = Equivalent)) +
-         geom_col(color = "black") + coord_polar(theta = "y") +
-         scale_fill_brewer(palette = "Spectral", direction=-1) + theme_void() + guides(fill = guide_legend(title="")) + 
-         ggtitle(ifelse(Tol_threshold ==100, paste(1, "Coverage threshold\nAll"), 
-                        paste(paste0("0.", Tol_threshold), "Coverage threshold\nAll"))) +
-         labs(subtitle = paste("N(Valid Stations) =", length(Hydrolaps_valid), "\nTime filter = ", 
-                              round(length(Hydrolaps_valid)/length(Hydrolaps)*100, 0), "%")) +
-         theme(plot.subtitle = element_text(size = 8))
-    )
-  
-  Plot_comp("DIATOM", Tol_threshold); Plot_comp("MACROINVERTEBRATE", Tol_threshold); Plot_comp("FISH", Tol_threshold)
-  
-}
-
-ggarrange(plotlist = c(sapply(grep("100",ls(), value = T), get), sapply(grep("95",ls(), value = T), get),
-                       sapply(grep("75",ls(), value = T), get)), ncol = 4, nrow = 3, widths = c(2,1,1,1))
-#####
-
-## Indices globaux
-#####
-
-Hydro_journaliere <- Hydro_journaliere[,c("count", "unique") := list(.N,uniqueN(resultat_obs_elab)), by = "code_site"][
-  count>=4 & unique > 1,][,c("count", "unique") := NULL]
-Hydro_journaliere[, c("Year_Lmean", "Year_Lscale", "Year_Lskew", "Year_Lkurt") := as.list(lmoms(resultat_obs_elab, nmom = 4)$ratios[1:4]), by = "code_site"][
-  , Year_Lmean := mean(resultat_obs_elab), by = "code_site"]
-
-Hydro_journaliere[, countM := uniqueN(resultat_obs_elab), by = c("code_site", "month")][, corrAR1 := NA_real_]
-Hydro_journaliere[, Deseas := (resultat_obs_elab - mean(resultat_obs_elab)), by = c("code_site","month")][
-  , Deseas := (Deseas - mean(Deseas)) / sd(Deseas), by = "code_site"]
-
-Hydro_journaliere[countM != 1,
-                  Year_corrAR1 := round(ar(Deseas, aic = FALSE, order.max = 1, method = "yule-walker")$ar, 2), by = "code_site"]
-
-Amplitude <- function(x){
-  
-  x[, Deseas := (resultat_obs_elab - mean(resultat_obs_elab)), by = "month"][
-    , Deseas := (Deseas - mean(Deseas)) / sd(Deseas)][
-      , corrAR1 := round(ar(Deseas, aic = FALSE, order.max = 1, method = "yule-walker")$ar, 2)]
-  
-  
-  jday <- lubridate::yday(x$date_obs_elab)
-  dec.year <- as.numeric(x$year) + (jday/365.25)
-  
-  scaled <- (x$resultat_obs_elab - mean(x$resultat_obs_elab)) / sd(x$resultat_obs_elab)
-  x_mat = cbind(1, sin(2 * pi * dec.year), cos(2 * pi * dec.year))
-  mod <- .lm.fit(x_mat, scaled)
-  a <- mod$coefficients[2]
-  b <- mod$coefficients[3]
-  
-  amplitude <- round(sqrt((a^2) + (b^2)), digits = 2)
-  
-  phase <- ifelse(a > 0, 365.25 * ((pi/2) - atan(b/a))/(2 * pi), 365.25 + 365.25 * ((pi/2) - pi - atan(b/a))/(2 * pi))
-  if(a == 0 & b > 0){ phase <- 365.25 }
-  if(a == 0 & b < 0) { phase <- 365.25/2 }
-  if(a == 0 & b == 0) { phase <- NA }
-  
-  return(cbind(code_site = unique(x$code_site), amplitude, phase))
-}
-
-Ampli <- as.data.table(do.call(rbind,lapply(unique(Hydro_journaliere[countM != 1,code_site]), function(si){
-  return(Amplitude(Hydro_journaliere[code_site == si,]))
-})))
-Hydro_journaliere <- left_join(Hydro_journaliere, Ampli, by = "code_site")
-
-Hydro_journaliere[, c("Year_MinJ", "Year_MaxJ") := list(min(resultat_obs_elab), max(resultat_obs_elab)), by = c("code_site", "year")]
-Hydro_journaliere[,  c("Month_MinJ", "Month_MaxJ") := list(min(resultat_obs_elab), max(resultat_obs_elab)), by = c("code_site", "year", "month")]
-Hydro_journaliere[, MeanMonth := mean(resultat_obs_elab), by = c("code_site", "month")][, 
-                                                                                        c("Year_MinM", "Year_MaxM") := list(min(MeanMonth), max(MeanMonth)), by = c("code_site", "year")][, MeanMonth := NULL]
-
-save(Hydro_journaliere, file = "Hydro_journaliere")
-
-
-

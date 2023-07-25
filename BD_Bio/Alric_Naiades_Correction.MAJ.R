@@ -2,7 +2,7 @@ invisible(lapply(c("data.table", "rgeos", "sp", "dplyr", "gridExtra", "lubridate
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("../DataBase_treatment/BD_Bio")
+setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 
 #####
 Resume_graphique <- function(Alric, Naiades, Group){
@@ -68,9 +68,9 @@ Resume_graphique(Alric = Alr_Abd_Diatom, Naiades = Nai_Abd_Diatom, Group = "Diat
 # Macroinvertebrates
 
 #####
-load("Naiades_Macroinvertebrate"); source("../../Hymobio_GitHub/BD_Bio/Alric_Macroinvertebrate.R")
+load("Naiades_Macroinvertebrate"); source("C:/Users/armirabel/Documents/INRAE/Hymobio/Hymobio_GitHub/BD_Bio/Alric_Macroinvertebrate.R")
 
-Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
+Nai_Station <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
                                       sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
 Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
 Nai_Station <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")),]
@@ -90,7 +90,7 @@ Nai_Abd_Macroinv_maj[Corr_philippe[!grep("Ne pas tenir compte|OK|Trop large",Pro
 Nai_Abd_Macroinv_maj <- Nai_Abd_Macroinv_maj[!NomLatin_Join %in% Corr_philippe[grep("Ne pas tenir compte|Trop large",Propositions), NomLatinAppelTaxon]]
 
 # integrate additional traits profiles, attribute a species code
-Traits_complement <- fread("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/ComplementSpeciesTraits_Macroinvertebrate.csv")[
+Traits_complement <- fread("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/ComplementSpeciesTraits_Macroinvertebrate.csv")[
   ,-c("Identifiant", "Nom_variable", "Libelle", "Attributs", "Description", "Fuzzy")][, Nom_final := gsub("INV_", "INV.", Nom_final)]
 CdToAdd <- dcast(melt(unique(Nai_Abd_Macroinv_maj[NomLatin_Join %in% names(Traits_complement)[-1], 
                  .(NomLatin_Join, CdAppelTaxon)]), id.vars = "NomLatin_Join"), variable ~ NomLatin_Join, fun.aggregate = function(x) {min(as.numeric(x))})
@@ -237,8 +237,8 @@ write.csv2(Traits_Macroinvertebrate, row.names = F, file = "FinalMAJ_Naiades.Alr
 # Fish
 
 #####
-load("Naiades_Fish"); source("../../Hymobio_GitHub/BD_Bio/Alric_Fish.R")
-Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
+load("Naiades_Fish"); source("C:/Users/armirabel/Documents/INRAE/Hymobio/Hymobio_GitHub/BD_Bio/Alric_Fish.R")
+Nai_Station <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
                              sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
 Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
 Nai_Station <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")),]
@@ -333,7 +333,7 @@ AllInv_Fish <- rbind(Nai_Abd_Fish_maj[ ,.(Group, MAJ, BDsource, IDoperation, CdS
 
 AllInv_Fish[grep("/", Date_PrelBio), Samp_date := as.Date(Date_PrelBio, format = "%d/%m/%Y")]
 AllInv_Fish[grep("-", Date_PrelBio), Samp_date := as.Date(Date_PrelBio, format = "%Y-%m-%d")]
-AllInv_Fish[, Date_PrelBio := SampDate][, SampDate := NULL]
+AllInv_Fish[, Date_PrelBio := Samp_date][, Samp_date := NULL]
 
 save(AllInv_Fish, file = "FinalMAJ_Naiades.Alric.Traits/Fish_Inventories")
 write.csv2(AllInv_Fish, row.names = F, file = "FinalMAJ_Naiades.Alric.Traits/Fish_Inventories.csv")
@@ -348,12 +348,12 @@ write.csv2(Traits_Fish, row.names = F, file = "FinalMAJ_Naiades.Alric.Traits/Fis
 # Diatoms
 
 #####
-Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
+Nai_Station <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
                                       sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
 Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
 Nai_Station <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")),]
 
-load("Naiades_Diatom"); source("../../Hymobio_GitHub/BD_Bio/Alric_Diatom.R")
+load("Naiades_Diatom"); source("C:/Users/armirabel/Documents/INRAE/Hymobio/Hymobio_GitHub/BD_Bio/Alric_Diatom.R")
 
 Nai_Abd_Diatom_maj <- Nai_Abd_Diatom[, NomLatin_Simple := sub("^(\\S*\\s+\\S+).*", "\\1", NomLatinAppelTaxon)][, NomLatin_Join := NomLatin_Simple]
 Nai_Abd_Diatom_maj[NomLatin_Join == "Pseudostaurosira (as", NomLatin_Join := "Fragilaria parasitica"]

@@ -1,11 +1,11 @@
 
-Alr_traits_Fish <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/2_FISHES/AMOBIO_FISH_Traits.csv",
+Alr_traits_Fish <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/2_FISHES/AMOBIO_FISH_Traits.csv",
                       sep=";"))[,.(Nom.vernaculaire, English.name, sciname, Code_TAXON, 
                                    tax.CLASS, tax.ORDER, tax.FAMILY, tax.GENUS, tax.SPECIES)]
 Alr_traits_Fish <- Alr_traits_Fish[,lapply(.SD, function(x) return(iconv(x, "ISO-8859-15", "UTF-8")))]
 Alr_traits_Fish[sciname == "Gymnocephalus cernua", sciname := "Gymnocephalus cernuus"]
 
-Alr_Abd_Fish <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/2_FISHES/AMOBIO_FISH_Abundance.csv",
+Alr_Abd_Fish <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/2_FISHES/AMOBIO_FISH_Abundance.csv",
                                   sep=";"))
 Alr_Abd_Fish <- Alr_Abd_Fish[!is.na(X_L93)]
 Alr_Abd_Fish <- Alr_Abd_Fish[!is.na(CODE_STATION),]

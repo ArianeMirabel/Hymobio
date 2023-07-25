@@ -2,6 +2,8 @@ invisible(lapply(c("data.table", "httr", "jsonlite","stringr", "sp", "parallel",
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
+setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro")
+
 # Get Stations
 #####
 Fields <- paste0("&fields=code_site,code_station,libelle_station,longitude_station,latitude_station,libelle_projection,",
@@ -182,7 +184,7 @@ save(Hydro_journaliere, file = "Hydro_journaliere_raw")
 Hydro_station_DataPresence <- Hydro_Station[, Presence_data := "Yes"][!code_station %in% unique(Hydro_journaliere$code_station), Presence_data := "No"]
 save(Hydro_station_DataPresence, file = "HydroStations_DataPresence")
 
-load("SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
+load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 Correspondance_station <- as.data.table(list_station_filter5_clean)[COMPARTIMENT_START %in% c("DIATOM", "MACROINVERTEBRATE", "FISH") & 
                           COMPARTIMENT_TARGET == "HYDRO"][,.(COMPARTIMENT_START, ID_AMOBIO_START, COMPARTIMENT_TARGET, ID_TARGET, to_keep)][
                           , Nstation := .N, by = "ID_AMOBIO_START"]
@@ -190,9 +192,9 @@ load("Hydro_journaliere")
 Correspondance_station <- Correspondance_station[ID_TARGET %in% unique(Hydro_journaliere$code_station)]
 rm(list = c("list_station_filter5_clean", "Hydro_journaliere"))
 
-load("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/Fish_Inventories")
-load("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/Macroinvertebrate_Inventories")
-load("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/Diatom_Inventories")
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/Fish_Inventories")
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/Macroinvertebrate_Inventories")
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/Diatom_Inventories")
 
 BioInv <- rbind(unique(AllInv_Fish[, ID_AMOBIO_START := paste0("FISH_", CdStation)][,.(CdStation, ID_AMOBIO_START, Date_PrelBio)]),
                 unique(AllInv_Macroinvertebrate[, ID_AMOBIO_START := paste0("MACROINVERTEBRATE_", CdStation)][,.(CdStation, ID_AMOBIO_START, Date_PrelBio)]),

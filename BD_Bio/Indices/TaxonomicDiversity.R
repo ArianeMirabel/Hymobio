@@ -2,7 +2,9 @@ invisible(lapply(c("data.table", "ggplot2", "entropart"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-dir <- "../../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/"
+setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
+
+dir <- "C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/"
 files <- list.files(dir)
 lapply(paste0(dir,files[setdiff(grep("_Inventories", files),grep(".csv", files))]), load, .GlobalEnv)
 

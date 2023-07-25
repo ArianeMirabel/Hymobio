@@ -1,13 +1,13 @@
 
-Alr_Names_Macroinv <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_transcodage.csv",
+Alr_Names_Macroinv <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_transcodage.csv",
                                        sep=";"))
 
 Alr_Names_Macroinv <- Alr_Names_Macroinv[,lapply(.SD, function(x) return(iconv(x, "ISO-8859-15", "UTF-8")))]
 Alr_Names_Macroinv <- Alr_Names_Macroinv[ ,tax.GENUS := sub(" .*", "", TAXON)]
 
-Alr_Traits_Macroinv <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_traits.csv",
+Alr_Traits_Macroinv <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_traits.csv",
                       sep=";"))
-Alr_Abd_Macroinv <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_RLQtable.csv",
+Alr_Abd_Macroinv <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_RLQtable.csv",
                                   sep=";"))
 Alr_Abd_Macroinv <- Alr_Abd_Macroinv[!is.na(x)]
 Alr_Abd_Macroinv <- Alr_Abd_Macroinv[,1:(grep("m",colnames(Alr_Abd_Macroinv))[1]-1), with = FALSE]
