@@ -104,7 +104,7 @@ Index_timestep <- function(Tstep, Hydro_Serie, station, tol_threshold){
   PrelDate[, period := 1:nrow(PrelDate)][, Start := Samp_date %m-% months(Tstep)]
   PrelDate <- left_join(PrelDate, PrelDate[, list(Date = seq.Date(from = Start, to = Samp_date, by = 'day')), by = "period"], by = "period")
 
-Hydro_serie <- inner_join(Hydro_Serie, PrelDate, by = "Date")
+Hydro_serie <- merge(Hydro_Serie, PrelDate, by = "Date")
 if(nrow(Hydro_serie) == 0) {return(NA)}
 Hydro_serie[, Tcover:= uniqueN(Date)/length(seq.Date(from = unique(Start), to = unique(Samp_date), by = 'day')), by = "period"]
 Hydro_serie <- Hydro_serie[Tcover >= 0.75][,Tcover := NULL]
@@ -116,9 +116,7 @@ if(nrow(Hydro_serie) == 0) {return(NA)}
      count >= 10 & unique > 1,][, c("count", "unique") := NULL]
      if(nrow(Hydro_serie) == 0) {return(NA)}
     Hydro_serie = Hydro_serie[, period := 0]
-    PrelDate <- data.table(Samp_date = NA_Date_, period = 0, Start = NA_Date_)
-    Tstep <- "all"}
-
+    PrelDate <- data.table(Samp_date = NA_Date_, period = 0, Start = NA_Date_)}
 
 Hydro_serie[, c("Lmean", "Lscale", "Lskew", "Lkurt") := as.list(lmoms(resultat_obs_elab, nmom = 4)$ratios[1:4]), by = "period"][
   , Lmean := mean(resultat_obs_elab), by = "period"]
@@ -133,22 +131,26 @@ if(uniqueN(Hydro_serie[,code_site])>1){print(paste("problem more sites", unique(
 Ampli <- do.call(rbind,lapply(unique(Hydro_serie$period), function(ti){
   return(Amplitude(Hydro_serie[period == ti,]))}))
 
-Hydro_serie <- left_join(unique(Hydro_serie[,.(code_site, period, Lmean, Lscale, Lskew, Lkurt, corrAR1)]),
-               Ampli, by = "period")
+Hydro_serie <- merge(Hydro_serie, Ampli, by = "period")
 
-Hydro_serie <- right_join(unique(PrelDate[,.(Samp_date, period, Start)]), Hydro_serie,
-               by = "period")[
-                 ,.(code_site, Samp_date, period, Lmean, Lscale, Lskew, Lkurt, corrAR1, Amplitude, Phase)]
+if(Tstep == 0){
+  Tstep <- "all"
+  Hydro_serie[, crue := resultat_obs_elab >= quantile(Hydro_serie$resultat_obs_elab, 0.9)*3][, Ncrue := length(which(crue))][, crue := NULL]
+}
 
-setnames(Hydro_serie, setdiff(colnames(Hydro_serie), c("code_site", "Samp_date")), paste0(setdiff(colnames(Hydro_serie), c("code_site", "Samp_date")), "_", Tstep))
+Hydro_serie <- unique(right_join(unique(PrelDate[,.(Samp_date, period, Start)]), Hydro_serie,
+               by = "period")[,intersect(colnames(Hydro_serie), 
+               c("code_site", "Samp_date", "period","Lmean","Lscale","Lskew", "Lkurt","corrAR1" ,"Amplitude","Phase","Ncrue")), with = F])
+
+setnames(Hydro_serie, setdiff(colnames(Hydro_serie), c("code_site", "Samp_date")),
+         paste0(setdiff(colnames(Hydro_serie), c("code_site", "Samp_date")), "_", Tstep))
 
 return(Hydro_serie)
 
 }
 
-
 rm(list=setdiff(ls(), c("Correspondance_station", "Hydro_journaliere", "stationBio")))
-
+Hydro_Serie = Xhydro; station = stationBio; tol_threshold = Tol_threshold; Tstep = 0
 
 Tol_threshold <- 0.75
 severalDates <-vector()

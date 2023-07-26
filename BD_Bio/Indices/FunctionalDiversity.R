@@ -2,25 +2,12 @@ invisible(lapply(c("data.table", "ggplot2", "entropart", "cluster", "dplyr", "St
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-dir <- "../../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/"
+dir <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/"
 files <- list.files(dir)
 lapply(paste0(dir,files[setdiff(grep("_Inventories|_Traits", files),grep(".csv", files))]), load, .GlobalEnv)
 
 
-Dissim<-dissim_trait; Abce <- Inv$Abundance; Names<-Inv$CdAppelTaxon_Join
-Indexes_measure_fun <- function(Abce, Names, Dissim){
-  ret <- tryCatch({lapply(0:2, function(Q){round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
-                                                          Dissim, Correction = "None"), q=Q),2)})},
-                  
-                  error = function(e) {print(e)})
-  return(ret)
-}
-
-#Inventory_Functional_wide <- function(Code, Inventory, Functional_tree) {
-  
-  Inv <- Inventory
-  
-for(trait in unique(Code$Category)){
+#Inventory_Functional_wide <- function(Code, Inventory, Functional_tree) {Inv <- Inventory;for(trait in unique(Code$Category)){
   traits <- Code[Category == trait, Abbreviations]
   dissim_trait <- as.matrix(daisy(data.frame(Functional_tree[, traits, with = F][, lapply(.SD, as.factor)], 
                                              row.names = Functional_tree$code), metric="gower"))
@@ -29,17 +16,23 @@ for(trait in unique(Code$Category)){
   Inv <- Inv[, paste(c("Richness_Fun", "Shannon_Fun", "Simpson_Fun"), gsub(" ","",trait), sep = "_") := Indexes_measure_fun(Abundance, CdAppelTaxon_Join, dissim_trait),
       by = c("CdStation","Year")]
 }
-  
-  
-  return(unique(Inv[ ,c("Group", "CdStation", "Year", grep("Richness|Shannon|Simpson", colnames(Inv), value = T)), with = F]))
+#return(unique(Inv[ ,c("Group", "CdStation", "Year", grep("Richness|Shannon|Simpson", colnames(Inv), value = T)), with = F]))
+
+Indexes_measure_fun <- function(Abce, Names, Dissim){
+  ret <- tryCatch({lapply(0:2, function(Q){round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
+                                                          Dissim, Correction = "None"), q=Q),2)})},
+                  
+                  error = function(e) {print(e)})
+  return(ret)
 }
 
+trait<-"Mig_WithCurr"
 Inventory_Functional_long <- function(Code, Inventory, Functional_tree) {
   
 ret <- lapply(unique(Code$Category), function (trait) {
-  
+  print(trait)
     Inv <- Inventory
-    traits <- Code[Category == trait, Abbreviations]
+    traits <- unique(Code[Category == trait, Abbreviations])
     dissim_trait <- as.matrix(daisy(data.frame(Functional_tree[, traits, with = F][, lapply(.SD, as.factor)], 
                                                row.names = Functional_tree$CdAppelTaxon), metric="gower"))
     dissim_trait <- 1 - dissim_trait/max(dissim_trait)
@@ -77,20 +70,15 @@ Index_Fun_Macroinv <- Inventory_Functional_long(Code_macroinv[Abbreviations %in%
 
 #Fish
 #####
-Code_fish <- fread(file = "Traits_code_Fish.csv")
-FunctionalTree_fish <- as.data.table(read.csv(
-  "../../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/2_FISHES/AMOBIO_FISH_RLQTable.csv",
-  sep=";"))[,]
+Code_fish <- fread(file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Traits_code_Fish.csv")
+FunctionalTree_fish <- unique(Traits_Fish)[, c("CdAppelTaxon", intersect(Code_fish$Abbreviations, colnames(Traits_Fish))), with = F]
 
-  
-  unique(Traits_Macroinvertebrate)[
-  , c("CdAppelTaxon", intersect(Code_fish$Abbreviations, colnames(Traits_Fish))), with = F]
+Code = Code_fish; Inventory = AllInv_Fish[!is.na(CdAppelTaxon_Join),][1:1000,]
+Functional_tree = FunctionalTree_fish
 
-Code = Code_macroinv; Inventory = AllInv_Macroinvertebrate[!CdAppelTaxon_Join %in% c("0", "Unmatched"),][1:1000,]
-Functional_tree = FunctionalTree_macroinv
-Index_Fun_Macroinv <- Inventory_Functional_long(Code_macroinv[Abbreviations %in% colnames(FunctionalTree_macroinv)],
-                                                AllInv_Macroinvertebrate[!CdAppelTaxon_Join %in% c("0", "Unmatched"),][1:1000,],
-                                                FunctionalTree_macroinv)
+Index_Fun_Fish <- Inventory_Functional_long(Code = Code_fish[Abbreviations %in% colnames(FunctionalTree_fish)],
+                                            Inventory = AllInv_Fish[!is.na(CdAppelTaxon_Join),][1:1000,],
+                                            Functional_tree = FunctionalTree_fish)
 
 
 #####
