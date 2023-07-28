@@ -251,7 +251,7 @@ Nai_Abd_Fish_maj <- Nai_Abd_Fish[, NomLatin_Join := NomLatinAppelTaxon]
 Nai_Abd_Fish_maj <- Nai_Abd_Fish_maj[!NomLatinAppelTaxon %in% Corr_Jerome[Propositions == "Discard", NomLatinAppelTaxon]]
 Nai_Abd_Fish_maj[Corr_Jerome[Propositions == "OK", .(NomLatinAppelTaxon, NomLatin_Join)], 
                  on = "NomLatinAppelTaxon", NomLatin_Join := i.NomLatin_Join]
-Nai_Abd_Fish_maj[grep("yprini", NomLatinAppelTaxon), NomLatin_Join := "Cyprinidae"]
+Nai_Abd_Fish_maj[grep("yprini", NomLatinAppelTaxon), NomLatinAppelTaxon := "Cyprinidae"]
 
 Nai_Abd_Fish_maj[NomLatinAppelTaxon %in% Corr_Jerome[grep("Unmatched|Too large", Propositions),NomLatinAppelTaxon], 
                  NomLatin_Join := "Unmatched"]
@@ -325,6 +325,7 @@ Supp_FishAlr[ , BDsource := "Alric"][, Group := "Fish"][, IDoperation := paste(G
 Supp_FishAlr <- left_join(Supp_FishAlr, Alr_traits_Fish, by = c("CdAppelTaxon" = "Code_TAXON"))[, NomLatin_Join := sciname][, CdAppelTaxon_Join := CdAppelTaxon]
 setnames(Supp_FishAlr, c("CODE_STATION", "DATE", "year", "tax.GENUS", "tax.FAMILY", "CdAppelTaxon", "sciname", "RsTaxRep"), 
     c("CdStation", "Date_PrelBio", "Year", "Genus", "Family", "CdAppelTaxon", "NomLatinAppelTaxon", "Abundance"))
+Supp_FishAlr[!CdAppelTaxon %in% Alr_traits_Fish$Code_TAXON, "CdAppelTaxon_Join" := NA]
 
 AllInv_Fish <- rbind(Nai_Abd_Fish_maj[ ,.(Group, MAJ, BDsource, IDoperation, CdStation, Date_PrelBio, Year, Genus, Family, 
                                           NomLatinAppelTaxon, CdAppelTaxon, NomLatin_Join, CdAppelTaxon_Join, Abundance)],

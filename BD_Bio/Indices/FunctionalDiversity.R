@@ -18,6 +18,7 @@ lapply(paste0(dir,files[setdiff(grep("_Inventories|_Traits", files),grep(".csv",
 }
 #return(unique(Inv[ ,c("Group", "CdStation", "Year", grep("Richness|Shannon|Simpson", colnames(Inv), value = T)), with = F]))
 
+#Abce = Inv$Abundance; Names=Inv$CdAppelTaxon_Join; Dissim = dissim_trait
 Indexes_measure_fun <- function(Abce, Names, Dissim){
   ret <- tryCatch({lapply(0:2, function(Q){round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
                                                           Dissim, Correction = "None"), q=Q),2)})},
@@ -26,19 +27,20 @@ Indexes_measure_fun <- function(Abce, Names, Dissim){
   return(ret)
 }
 
-trait<-"Mig_WithCurr"
+#trait<-"Mig_SwimMode"
 Inventory_Functional_long <- function(Code, Inventory, Functional_tree) {
   
 ret <- lapply(unique(Code$Category), function (trait) {
-  print(trait)
-    Inv <- Inventory
+  
     traits <- unique(Code[Category == trait, Abbreviations])
-    dissim_trait <- as.matrix(daisy(data.frame(Functional_tree[, traits, with = F][, lapply(.SD, as.factor)], 
-                                               row.names = Functional_tree$CdAppelTaxon), metric="gower"))
+    Tree <- Functional_tree[, traits, with = F][, (traits) := lapply(.SD, function(i){i[is.na(i)] <- 0; i}), .SDcols = traits][
+      , lapply(.SD, as.factor)]
+    Inv <- Inventory
+    dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
     dissim_trait <- 1 - dissim_trait/max(dissim_trait)
     
-    Inv[, c("Richness_Fun", "Shannon_Fun", "Simpson_Fun") := Indexes_measure_fun(Abundance, CdAppelTaxon_Join, dissim_trait),
-               by = c("CdStation","Year")][, Category := gsub(" ","",trait)]
+    Inv[, c("Richness_Fun", "Shannon_Fun", "Simpson_Fun") := Indexes_measure_fun(Abce = Abundance, Names = CdAppelTaxon_Join, 
+          Dissim = dissim_trait), by = c("CdStation","Year")][, Category := gsub(" ","",trait)]
     
    return(unique(Inv[ ,c("Group", "CdStation", "Year", "Richness_Fun", "Shannon_Fun", "Simpson_Fun", "Category"), with = F]))
 })
@@ -73,11 +75,10 @@ Index_Fun_Macroinv <- Inventory_Functional_long(Code_macroinv[Abbreviations %in%
 Code_fish <- fread(file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Traits_code_Fish.csv")
 FunctionalTree_fish <- unique(Traits_Fish)[, c("CdAppelTaxon", intersect(Code_fish$Abbreviations, colnames(Traits_Fish))), with = F]
 
-Code = Code_fish; Inventory = AllInv_Fish[!is.na(CdAppelTaxon_Join),][1:1000,]
-Functional_tree = FunctionalTree_fish
+Code = Code_fish; Inventory = AllInv_Fish[!is.na(CdAppelTaxon_Join),][1:1000,];Functional_tree = FunctionalTree_fish
 
 Index_Fun_Fish <- Inventory_Functional_long(Code = Code_fish[Abbreviations %in% colnames(FunctionalTree_fish)],
-                                            Inventory = AllInv_Fish[!is.na(CdAppelTaxon_Join),][1:1000,],
+                                            Inventory = AllInv_Fish[!is.na(CdAppelTaxon_Join),],
                                             Functional_tree = FunctionalTree_fish)
 
 
