@@ -1,0 +1,15 @@
+#ORDRE BASH
+
+cd /usr/local/data/Amobio/AMOHYMOBIO/
+ls -lai
+chmod 777 -R *
+find . -type f \( -iname "*.R" \) -exec dos2unix {} +
+
+nohup ./chemical_computation_1.R 
+nohup ./chemical_computation_2.R &
+nohup ./chemical_computation_3.R &
+nohup ./chemical_computation_4.R
+
+
+ctrl Z => stop stuff
+bg

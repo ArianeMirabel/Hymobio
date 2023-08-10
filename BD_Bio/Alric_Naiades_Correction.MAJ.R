@@ -176,8 +176,7 @@ for(i.species in 1:nrow(Torep)){
       } else { Nomatch <- c(Nomatch, species$NomLatin_Join)}
 }
 
-Nai_Abd_Macroinv_maj[NomLatin_Join %in% unlist(Nomatch), NomLatin_Join := "Unmatched"][
-  NomLatin_Join == "Unmatched", CdAppelTaxon_Join := 0]
+Nai_Abd_Macroinv_maj[NomLatin_Join %in% unlist(Nomatch), NomLatin_Join := NA][NomLatin_Join == "Unmatched", CdAppelTaxon_Join := NA]
 
 # Complete with additional information
 setnames(Nai_Abd_Macroinv_maj, c("CdStationMesureEauxSurface", "DateDebutOperationPrelBio", "year", "tax.GENUS", "FAMILLE", "RsTaxRep"),
@@ -192,15 +191,15 @@ Supp_MacroinvertebratesAlr <- melt(Supp_MacroinvertebratesAlr, id.vars = c("cd_s
      "typo_nationale", "rang_corr", "agence"), measure.vars = grep("X",colnames(Supp_MacroinvertebratesAlr), value = T),
      variable.name = "CdAppelTaxon_Join", value.name = "RsTaxRep")[, CdAppelTaxon_Join := gsub("X","", CdAppelTaxon_Join)][RsTaxRep != 0]
 Supp_MacroinvertebratesAlr <- left_join(Supp_MacroinvertebratesAlr, Alr_Names_Macroinv, by = "CdAppelTaxon_Join")
-Supp_MacroinvertebratesAlr[!CdAppelTaxon_Join %in% Alr_Traits_Macroinv$code_taxon_Alric2021, CdAppelTaxon_Join := "Unmatched"]
+Supp_MacroinvertebratesAlr[!CdAppelTaxon_Join %in% Alr_Traits_Macroinv$code_taxon_Alric2021, CdAppelTaxon_Join := NA]
 
 setnames(Supp_MacroinvertebratesAlr, c("cd_site", "date_opecont", "year", "tax.GENUS", "FAMILLE",  "RsTaxRep"), 
          c("CdStation", "Date_PrelBio", "Year", "Genus", "Family", "Abundance"))
 Supp_MacroinvertebratesAlr$NomLatinAppelTaxon <- Supp_MacroinvertebratesAlr$NomLatin_Join
 Supp_MacroinvertebratesAlr <- Supp_MacroinvertebratesAlr[ ,.(CdStation, Date_PrelBio, Year, Genus, Family, NomLatinAppelTaxon, NomLatin_Join, CdAppelTaxon_Join, Abundance)]
 Supp_MacroinvertebratesAlr[, CdAppelTaxon := CdAppelTaxon_Join][ , BDsource := "Alric"][, Group := "Macroinvertebrate"][, IDoperation := paste(Group, CdStation, Year, sep = "_")][,MAJ := "Ariane_March2023"]
-Supp_MacroinvertebratesAlr[NomLatin_Join %in% Nai_Abd_Macroinv_maj[NomLatin_Join == "Unmatched", NomLatinAppelTaxon], 
-                           c("NomLatin_Join", "CdAppelTaxon_Join") := "Unmatched"]
+Supp_MacroinvertebratesAlr[NomLatin_Join %in% Nai_Abd_Macroinv_maj[is.na(NomLatin_Join), NomLatinAppelTaxon], 
+                           c("NomLatin_Join", "CdAppelTaxon_Join") := NA]
 
 AllInv_Macroinvertebrate <- rbind(Nai_Abd_Macroinv_maj,Supp_MacroinvertebratesAlr)[ ,.(Group, MAJ, BDsource, IDoperation, CdStation, Date_PrelBio, Year, Genus, Family,
                NomLatinAppelTaxon, NomLatin_Join, CdAppelTaxon, CdAppelTaxon_Join, Abundance)][order(IDoperation)]
@@ -219,7 +218,7 @@ write.csv2(AllInv_Macroinvertebrate, row.names = F, file = "FinalMAJ_Naiades.Alr
 Traits_Macroinvertebrate <- Alr_Traits_Macroinv
 setnames(Traits_Macroinvertebrate, "code_taxon_Alric2021","CdAppelTaxon")
 
-AllInv_Macroinvertebrate[CdAppelTaxon != "Unmatched", CdAppelTaxon := as.numeric(CdAppelTaxon)]
+AllInv_Macroinvertebrate[!is.na(CdAppelTaxon), CdAppelTaxon := as.numeric(CdAppelTaxon)]
 
 Traits_complement[is.na(Traits_complement)] <- 0
 Traits_complement <- dcast(melt(Traits_complement, id.vars = "Nom_final"), variable ~ Nom_final)
@@ -523,6 +522,10 @@ save(AllInv_Diatom, file = "FinalMAJ_Naiades.Alric.Traits/Diatom_Inventories")
 write.csv2(AllInv_Diatom, row.names = F, file = "FinalMAJ_Naiades.Alric.Traits/Diatom_Inventories.csv")
 
 Traits_Diatom <- fread("FinalMAJ_Naiades.Alric.Traits/Diatom_Traits.csv")
+traits <- setdiff(colnames(Traits_Diatom), c("code", "type", "taxo", "refuni", "fam", "genre", "terato", "tax_ibd"))
+Traits_Diatom[, (traits) := lapply(.SD, function(x){as.numeric(gsub(",",".",x))}), .SDcols = traits]
+setnames(Traits_Diatom, "code", "CdAppelTaxon")
+  
 save(Traits_Diatom, file = "FinalMAJ_Naiades.Alric.Traits/Diatom_Traits")
 write.csv2(Traits_Diatom, row.names = F, file = "FinalMAJ_Naiades.Alric.Traits/Diatom_Traits.csv")
 #####
