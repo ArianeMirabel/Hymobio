@@ -149,11 +149,19 @@ ifelse(any(unlist(lapply(Hydro_laps[as.character(head(laps, -1))],is.data.frame)
                 warning = function(w){ print(paste(stationBio, "\n", w))}),
        Hydro_laps <- NA)
 
+if(is.data.table(Hydro_laps)) {Hydro_laps$ID_AMOBIO_START <- stationBio}
+if(is.data.table(Hydro_all))  {Hydro_all$ID_AMOBIO_START <- stationBio}
 
 return(list(Hydro_laps, Hydro_all))
 
 })
-names(Hydrolaps) <- unique(Correspondance_station[, ID_AMOBIO_START])
+
+Hydrolaps <- lapply(Hydrolaps, function(si){
+  if(!is.data.table(si[[1]])){return(si[[2]])
+  } else {
+  return(merge(si[[1]], si[[2]][,c("code_site",grep("all", names(si[[2]]), value = T)), with = F], by = "code_site", all = T))}
+ })
+
 
 save(Hydrolaps, file = "HydroIndex_36125all")
 #####
