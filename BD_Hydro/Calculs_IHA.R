@@ -111,6 +111,8 @@ laps <- c(3,6,12,50,0)
 
 Hydrolaps <- lapply(unique(Correspondance_station[, ID_AMOBIO_START]), function(stationBio){
   
+  pb <- txtProgressBar(min = 0, max = uniqueN(Correspondance_station[, ID_AMOBIO_START]), style = 3)
+  
   sampling_date <- unique(Correspondance_station[ID_AMOBIO_START ==  stationBio & to_keep == TRUE, Date_PrelBio])
   
   if(any(setdiff(Correspondance_station[ID_AMOBIO_START ==  stationBio & to_keep == FALSE, Date_PrelBio], sampling_date))){
@@ -153,6 +155,8 @@ if(is.data.table(Hydro_laps)) {Hydro_laps$ID_AMOBIO_START <- stationBio}
 if(is.data.table(Hydro_all))  {Hydro_all$ID_AMOBIO_START <- stationBio}
 
 return(list(Hydro_laps, Hydro_all))
+
+setTxtProgressBar(pb, which(unique(Correspondance_station[, ID_AMOBIO_START])) == stationBio)
 
 })
 

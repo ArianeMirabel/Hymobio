@@ -83,29 +83,36 @@ Amplitude <- function(x){
 }
 
 # Measure IHA for the sampling dates, for the given time steps
-Index_timestep <- function(Tstep, Temp_Serie, station, tol_threshold){
- 
+Index_timestep <- function(Tstep, Temp_Serie, Station, Sampling_date, Tol_threshold){
+  
+  if (Tstep > 12){Tstep <- time_length(years(Tstep/10), unit = "months")}
+  
    if(Tstep != 0){
-  PrelDate <- data.table(Samp_date = Correspondance_station[ID_AMOBIO_START == station, Date_PrelBio])
-  PrelDate[, period := 1:nrow(PrelDate)][, Start := Samp_date %m-% months(Tstep)]
-  PrelDate <- left_join(PrelDate, PrelDate[, list(Date = seq.Date(from = Start, to = Samp_date, by = 'day')), by = "period"], by = "period")
+     Sampling_Date <- data.table(Samp_date = Sampling_date)
+     Sampling_Date[, period := 1:nrow(Sampling_Date)][, Start := Samp_date %m-% months(Tstep)]
+     tryCatch({ Sampling_Date <-
+       left_join(Sampling_Date, Sampling_Date[, list(Date = seq.Date(from = Start, to = Samp_date, by = 'day')), by = "period"], by = "period")},
+       warning = function(w){ print(paste(w, "\n", Station))}                
+     )
+        
+Temp_serie <- merge(Temp_Serie, Sampling_Date, by = "Date")
 
-Temp_serie <- merge(Temp_Serie, PrelDate, by = "Date")
 if(nrow(Temp_serie) == 0) {return(NA)}
+
 Temp_serie[, Tcover:= uniqueN(Date)/length(seq.Date(from = unique(Start), to = unique(Samp_date), by = 'day')), by = "period"]
-Temp_serie <- Temp_serie[Tcover >= 0.75][,Tcover := NULL]
+Temp_serie <- Temp_serie[Tcover >= Tol_threshold][,Tcover := NULL]
 Temp_serie <- Temp_serie[, c("count", "unique") := list(.N, uniqueN(Tw_corr)), by = "period"][
   count >= 10 & unique > 1,][, c("count", "unique") := NULL]
+
 if(nrow(Temp_serie) == 0) {return(NA)}
+
    } else {
      Temp_serie <- Temp_Serie[, c("count", "unique") := list(.N, uniqueN(Tw_corr))][
      count >= 10 & unique > 1,][, c("count", "unique") := NULL]
      if(nrow(Temp_serie) == 0) {return(NA)}
-    Temp_serie = Temp_serie[, period := 0]
-    PrelDate <- data.table(Samp_date = NA_Date_, period = 0, Start = NA_Date_)
-    Tstep <- "all"}
-
-
+    Temp_serie = Temp_serie[, c("period", "Samp_date", "Start") := list(0, NA_Date_, NA_Date_)]
+   }
+  
 Temp_serie[, c("Lmean", "Lscale", "Lskew", "Lkurt") := as.list(lmoms(Tw_corr, nmom = 4)$ratios[1:4]), by = "period"][
   , Lmean := mean(Tw_corr), by = "period"]
 
@@ -114,53 +121,83 @@ Temp_serie[, Deseas := (Tw_corr - mean(Tw_corr)), by = c("period", "month")][
 
 Temp_serie[, corrAR1 := round(ar(Deseas, aic = FALSE, order.max = 1, method = "yule-walker")$ar, 2), by = "period"]
 
-if(uniqueN(Temp_serie[,stationID])>1){print(paste("problem more sites", unique(Temp_serie[,stationID])))}
-
 Ampli <- do.call(rbind,lapply(unique(Temp_serie$period), function(ti){
   return(Amplitude(Temp_serie[period == ti,]))}))
 
-Temp_serie <- left_join(unique(Temp_serie[,.(stationID, period, Lmean, Lscale, Lskew, Lkurt, corrAR1)]),
-               Ampli, by = "period")
+Temp_serie <- merge(Temp_serie, Ampli, by = "period")
 
-Temp_serie <- right_join(unique(PrelDate[,.(Samp_date, period, Start)]), Temp_serie,
-               by = "period")[
-                 ,.(stationID, Samp_date, period, Lmean, Lscale, Lskew, Lkurt, corrAR1, Amplitude, Phase)]
+if(Tstep == 0){
+  Tstep <- "all"
+  Temp_serie[, extreme := Tw_corr >= quantile(Temp_serie$Tw_corr, 0.9)*3][, Nextreme := length(which(extreme))][
+    , extreme := NULL]
+}
 
-setnames(Temp_serie, setdiff(colnames(Temp_serie), c("stationID", "Samp_date")), paste0(setdiff(colnames(Temp_serie), c("stationID", "Samp_date")), "_", Tstep))
+Temp_serie <- unique(Temp_serie[,intersect(names(Temp_serie),
+    c("stationID", "Samp_date", "period", "Lmean", "Lscale", "Lskew", "Lkurt", "corrAR1", "Amplitude", "Phase", "Nextreme")), with = F])
+
+setnames(Temp_serie, setdiff(colnames(Temp_serie), c("stationID", "Samp_date")), 
+         paste0("T_",setdiff(colnames(Temp_serie), c("stationID", "Samp_date")), "_", Tstep))
 
 return(Temp_serie)
 
 }
 
+tol_threshold <- 0.75
+laps <- c(3,6,12,50,0)
 
-rm(list=setdiff(ls(), c("Correspondance_station", "Temp_journaliere", "stationBio")))
-
-
-Tol_threshold <- 0.75
-severalDates <-vector()
 Templaps <- lapply(unique(Correspondance_station[, ID_AMOBIO_START]), function(stationBio){
-
-if(uniqueN(Correspondance_station[ID_AMOBIO_START ==  stationBio, ID_TARGET]) == 1){
-  Xtemp <- Temp_journaliere[stationID %in% unique(Correspondance_station[ID_AMOBIO_START ==  stationBio, ID_TARGET])][
-  , Date := as.Date(Date)]
-} else {print(paste("Several Stations for", stationBio))}
   
-Temp_laps <- tryCatch({lapply(c(3,6,12,0), function(tstep){
-  return(Index_timestep(Tstep = tstep, Temp_Serie = Xtemp, station = stationBio, tol_threshold = Tol_threshold))})},
+  pb <- txtProgressBar(min = 0, max = uniqueN(Correspondance_station[, ID_AMOBIO_START]), style = 3)
+  
+  sampling_date <- unique(Correspondance_station[ID_AMOBIO_START ==  stationBio , Date_PrelBio])
+  
+  if(uniqueN(Correspondance_station[ID_AMOBIO_START ==  stationBio, ID_TARGET]) == 1){
+    Xtemp <- Temp_journaliere[stationID %in% unique(Correspondance_station[ID_AMOBIO_START ==  stationBio, ID_TARGET])][
+      , Date := as.Date(Date)]
+  } else {print(paste("Several Stations for", stationBio))}
+  
+  Xtemp[, Ndates := .N , by = Date]
+  if(any(Xtemp$Ndates > 1)){print(paste("Several dates in", stationBio))}
+  Xtemp[,Ndates := NULL]
+  
+
+Temp_laps <- tryCatch({lapply(laps, function(tstep){
+  return(Index_timestep(Tstep = tstep, Temp_Serie = Xtemp, Station = stationBio, Sampling_date = sampling_date,
+                        Tol_threshold = tol_threshold))})},
   error = function(e) print(paste("Error with", stationBio, e)))
 
-Temp_all <- Temp_laps[[3]]
+names(Temp_laps) <- laps
 
-ifelse(any(unlist(lapply(Temp_laps[1:3],is.data.frame))), 
-       Temp_laps <- Reduce(function(...) left_join(..., by = c("stationID", "Samp_date")), 
-                           Temp_laps[1:3][which(unlist(lapply(Temp_laps[1:3],is.data.frame)))]),
+Temp_all <- Temp_laps[["0"]]
+
+ifelse(any(unlist(lapply(Temp_laps[as.character(head(laps, -1))],is.data.frame))), 
+       tryCatch({
+         Temp_laps <- Reduce(function(...) left_join(..., by = c("stationID", "Samp_date")), 
+         Temp_laps[as.character(head(laps, -1))][which(unlist(lapply(Temp_laps[as.character(head(laps, -1))],is.data.frame)))])
+       },
+       warning = function(w){ print(paste(stationBio, "\n", w))}),
        Temp_laps <- NA)
 
+if(is.data.table(Temp_laps)) {Temp_laps$ID_AMOBIO_START <- stationBio}
+if(is.data.table(Temp_all))  {Temp_all$ID_AMOBIO_START <- stationBio}
+
+setTxtProgressBar(pb, which(unique(Correspondance_station[, ID_AMOBIO_START]) == stationBio))
 
 return(list(Temp_laps, Temp_all))
 
 })
-names(Templaps) <- unique(Correspondance_station[, ID_AMOBIO_START])
 
-save(Templaps, file = "TempIndex_3612all")
+
+Templaps <- lapply(Templaps, function(si){
+  if(!is.data.table(si[[1]])){return(si[[2]])
+  } else {
+    return(merge(si[[1]], si[[2]][,c("code_site",grep("all", names(si[[2]]), value = T)), with = F], by = "code_site", all = T))}
+})
+
+Templaps <- Templaps[which(unlist(lapply(Templaps, is.data.table)))]
+Templaps <- rbindlist(Templaps, fill = T)
+Templaps <- Templaps[,c("ID_AMOBIO_START", "code_site", "Samp_date", grep("T_", colnames(Templaps), value = T))]
+
+
+save(Templaps, file = "TempIndex_36125all_AM_20230817")
 #####
