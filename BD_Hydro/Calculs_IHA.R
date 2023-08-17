@@ -91,7 +91,7 @@ Hydro_serie <- merge(Hydro_serie, Ampli, by = "period")
 if(Tstep == 0){
   Tstep <- "all"
   Hydro_serie[, crue := resultat_obs_elab >= quantile(Hydro_serie$resultat_obs_elab, 0.9)*3][, Ncrue := length(which(crue))][
-    , crue := NULL]
+    , crue := NULL][,code_site := code_site[1]]
 }
 
 Hydro_serie <- unique(Hydro_serie[,intersect(colnames(Hydro_serie), 
@@ -139,8 +139,6 @@ Hydro_laps <- tryCatch({lapply(laps, function(tstep){
 
 names(Hydro_laps) <- laps
 
-#if(!any(unlist(lapply(Hydro_laps,is.data.frame)))){print(stationBio)}
-
 Hydro_all <- Hydro_laps[["0"]]
 
 ifelse(any(unlist(lapply(Hydro_laps[as.character(head(laps, -1))],is.data.frame))), 
@@ -160,6 +158,9 @@ setTxtProgressBar(pb, which(unique(Correspondance_station[, ID_AMOBIO_START])) =
 
 })
 
+testNA <- unlist(lapply(Hydrolaps, function(si){anyNA(si[,ID_AMOBIO_START])}))
+print("check for nas")
+
 Hydrolaps <- lapply(Hydrolaps, function(si){
   if(!is.data.table(si[[1]])){return(si[[2]])
   } else {
@@ -170,13 +171,24 @@ Hydrolaps <- Hydrolaps[which(unlist(lapply(Hydrolaps, is.data.table)))]
 Hydrolaps <- rbindlist(Hydrolaps, fill = T)
 setnames(Hydrolaps, setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site", "Samp_date")), 
          paste0("H_", setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site", "Samp_date"))))
-Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "code_site", "Samp_date", grep("H_", colnames(Hydrolaps), value = T))]
+Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "code_site", "Samp_date", grep("H_", colnames(Hydrolaps), value = T)), with = F]
+setnames(Hydrolaps, "code_site", "CdStation")
 
-save(Hydrolaps, file = "HydroIndex_36125all_AM_20230816")
+save(Hydrolaps, file = "HydroIndex_36125all_AM_20230817")
 #####
 
 ## Plot validité données
 #####
+laps <- c("3","6","12","60","all")
+Plot_valid <- Hydrolaps[!is.na(ID_AMOBIO_START)][, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
+            paste0("NAs_",laps) := lapply(laps, function(i){length(which(is.na(get(paste0("H_Lmean_",i)))))}), by = c("Compartment", "Year")]
+Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"][
+  , Mean_Ncrue := mean(H_Ncrue_all), by = "Year"]
+Plot_valid <- unique(Plot_valid[,.(Compartment,Year, Mean_Ncrue, NAs_3, NAs_6, NAs_12, NAs_60, NAs_all, MeanLap_3, MeanLap_6,
+                                   MeanLap_12, MeanLap_60, MeanLap_all)])[!is.na(Year)]
+
+
+
 Plot_comp <- function(Compartment, Threshold){
   Nstat <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])
   Nperc <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])/sum(Pie_selection[Comp == Compartment, Eff_coverage])
@@ -191,14 +203,8 @@ Plot_comp <- function(Compartment, Threshold){
          envir = parent.frame())
 }
 
-for(Tol_threshold in c(75, 95, 100)){
-  load(paste0("HydroIndex_3612_", Tol_threshold, "thresh"))
-  
-  Hydrolaps_valid <- Hydrolaps[which(unlist(lapply(Hydrolaps, is.data.frame)))]
-  Hydrolaps_miss <- Hydrolaps[which(!unlist(lapply(Hydrolaps, is.data.frame)))]
-  
-  Pie_selection <- rbind(data.table(Stations = names(Hydrolaps_valid),
-                                    Coverage = unlist(lapply(Hydrolaps_valid, ncol))),
+Pie_selection <- rbind(data.table(Stations = names(Hydrolaps),
+                                    Coverage = unlist(lapply(Hydrolaps, ncol))),
                          data.table(Stations = names(Hydrolaps_miss), 
                                     Coverage = 0))
   Cover <- data.frame(Equivalent = c("All periods", "Two periods", "Single period", "No overlap"),
@@ -220,66 +226,10 @@ for(Tol_threshold in c(75, 95, 100)){
   
   Plot_comp("DIATOM", Tol_threshold); Plot_comp("MACROINVERTEBRATE", Tol_threshold); Plot_comp("FISH", Tol_threshold)
   
-}
 
 ggarrange(plotlist = c(sapply(grep("100",ls(), value = T), get), sapply(grep("95",ls(), value = T), get),
                        sapply(grep("75",ls(), value = T), get)), ncol = 4, nrow = 3, widths = c(2,1,1,1))
 #####
-
-## Indices globaux
-#####
-
-Hydro_journaliere <- Hydro_journaliere[,c("count", "unique") := list(.N,uniqueN(resultat_obs_elab)), by = "code_site"][
-  count>=4 & unique > 1,][,c("count", "unique") := NULL]
-Hydro_journaliere[, c("Year_Lmean", "Year_Lscale", "Year_Lskew", "Year_Lkurt") := as.list(lmoms(resultat_obs_elab, nmom = 4)$ratios[1:4]), by = "code_site"][
-  , Year_Lmean := mean(resultat_obs_elab), by = "code_site"]
-
-Hydro_journaliere[, countM := uniqueN(resultat_obs_elab), by = c("code_site", "month")][, corrAR1 := NA_real_]
-Hydro_journaliere[, Deseas := (resultat_obs_elab - mean(resultat_obs_elab)), by = c("code_site","month")][
-  , Deseas := (Deseas - mean(Deseas)) / sd(Deseas), by = "code_site"]
-
-Hydro_journaliere[countM != 1,
-                  Year_corrAR1 := round(ar(Deseas, aic = FALSE, order.max = 1, method = "yule-walker")$ar, 2), by = "code_site"]
-
-Amplitude <- function(x){
-  
-  x[, Deseas := (resultat_obs_elab - mean(resultat_obs_elab)), by = "month"][
-    , Deseas := (Deseas - mean(Deseas)) / sd(Deseas)][
-      , corrAR1 := round(ar(Deseas, aic = FALSE, order.max = 1, method = "yule-walker")$ar, 2)]
-  
-  
-  jday <- lubridate::yday(x$date_obs_elab)
-  dec.year <- as.numeric(x$year) + (jday/365.25)
-  
-  scaled <- (x$resultat_obs_elab - mean(x$resultat_obs_elab)) / sd(x$resultat_obs_elab)
-  x_mat = cbind(1, sin(2 * pi * dec.year), cos(2 * pi * dec.year))
-  mod <- .lm.fit(x_mat, scaled)
-  a <- mod$coefficients[2]
-  b <- mod$coefficients[3]
-  
-  amplitude <- round(sqrt((a^2) + (b^2)), digits = 2)
-  
-  phase <- ifelse(a > 0, 365.25 * ((pi/2) - atan(b/a))/(2 * pi), 365.25 + 365.25 * ((pi/2) - pi - atan(b/a))/(2 * pi))
-  if(a == 0 & b > 0){ phase <- 365.25 }
-  if(a == 0 & b < 0) { phase <- 365.25/2 }
-  if(a == 0 & b == 0) { phase <- NA }
-  
-  return(cbind(code_site = unique(x$code_site), amplitude, phase))
-}
-
-Ampli <- as.data.table(do.call(rbind,lapply(unique(Hydro_journaliere[countM != 1,code_site]), function(si){
-  return(Amplitude(Hydro_journaliere[code_site == si,]))
-})))
-Hydro_journaliere <- tryCatch(left_join(Hydro_journaliere, Ampli, by = "code_site"),
-                              warning(w){ print(paste("warnings with", stationBio))})
-
-Hydro_journaliere[, c("Year_MinJ", "Year_MaxJ") := list(min(resultat_obs_elab), max(resultat_obs_elab)), by = c("code_site", "year")]
-Hydro_journaliere[,  c("Month_MinJ", "Month_MaxJ") := list(min(resultat_obs_elab), max(resultat_obs_elab)), by = c("code_site", "year", "month")]
-Hydro_journaliere[, MeanMonth := mean(resultat_obs_elab), by = c("code_site", "month")][, 
-                                                                                        c("Year_MinM", "Year_MaxM") := list(min(MeanMonth), max(MeanMonth)), by = c("code_site", "year")][, MeanMonth := NULL]
-
-save(Hydro_journaliere, file = "Hydro_journaliere")
-
 
 
 ##Cleaning data
@@ -314,21 +264,5 @@ Hydro_journaliere[, Validation_steady := "OK"]
 Hydro_journaliere[Run_periods, on = c("code_station", "Date"), Validation_steady := i.Validation_steady]
 Hydro_journaliere_corrected <- Hydro_journaliere[Validation_steady == "OK"][code_station != "J571211002"]
 rm("Hydro_journaliere")
-
-# Problematic stations J571211002
-
-DebitMoyen <- unique(Hydro_journaliere_corrected [, Qmoyen := mean(resultat_obs_elab), by = code_station][,.(code_station, Qmoyen)])
-Breaks <- seq(0, ceiling(max(DebitMoyen$Qmoyen)/10)*10, length.out = 15)
-DebitMoyen[, Intervals := cut(Qmoyen, breaks = Breaks, include.lowest = TRUE, labels = formatC(Breaks[-1], format = "e", digits = 0))][, EffInt := .N, by = Intervals]
-Breaks2 <- seq(0, ceiling(max(DebitMoyen[Qmoyen < 1.92e+05, Qmoyen])/10)*10, length.out = 12)
-Debit2 <- DebitMoyen[Qmoyen < 1.92e+05][, 
-                                        Intervals := cut(Qmoyen, breaks = Breaks2, include.lowest = TRUE, labels = formatC(Breaks2[-1], format = "e", digits = 0))]
-DebitMoyen[Debit2, on = "code_station", Intervals := i.Intervals][, EffInt := .N, by = Intervals]
-
-plot(DebitMoyen$Qmoyen)
-ggplot(data = unique(unique(DebitMoyen[,.(EffInt, Intervals)])), aes(x = Intervals, y = EffInt)) +
-  geom_bar(stat= "identity")
-
-
 
 #####
