@@ -162,8 +162,13 @@ Hydrolaps <- lapply(Hydrolaps, function(si){
   return(merge(si[[1]], si[[2]][,c("code_site",grep("all", names(si[[2]]), value = T)), with = F], by = "code_site", all = T))}
  })
 
+Hydrolaps <- Hydrolaps[which(unlist(lapply(Hydrolaps, is.data.table)))]
+Hydrolaps <- rbindlist(Hydrolaps, fill = T)
+setnames(Hydrolaps, setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site", "Samp_date")), 
+         paste0("H_", setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site", "Samp_date"))))
+Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "code_site", "Samp_date", grep("H_", colnames(Hydrolaps), value = T))]
 
-save(Hydrolaps, file = "HydroIndex_36125all")
+save(Hydrolaps, file = "HydroIndex_36125all_AM_20230816")
 #####
 
 ## Plot validité données
