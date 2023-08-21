@@ -166,31 +166,47 @@ print("check for nas")
 Hydrolaps <- lapply(Hydrolaps, function(si){
   if(!is.data.table(si[[1]])){return(si[[2]])
   } else {
-  return(merge(si[[1]], si[[2]][,c("code_site",grep("all", names(si[[2]]), value = T)), with = F], by = "code_site", all = T))}
+  return(cbind(si[[1]], si[[2]][,setdiff(names(si[[2]]), names(si[[1]])), with = F]))}
  })
 
 Hydrolaps <- Hydrolaps[which(unlist(lapply(Hydrolaps, is.data.table)))]
 Hydrolaps <- rbindlist(Hydrolaps, fill = T)
-setnames(Hydrolaps, setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site", "Samp_date")), 
-         paste0("H_", setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site", "Samp_date"))))
-Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "code_site", "Samp_date", grep("H_", colnames(Hydrolaps), value = T)), with = F]
-setnames(Hydrolaps, "code_site", "CdStation")
+Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "Samp_date", grep("H_", colnames(Hydrolaps), value = T)), with = F]
 
-save(Hydrolaps, file = "HydroIndex_36125all_AM_20230818_intermediate")
+save(Hydrolaps, file = "HydroIndex_36125all_AM_20230821")
 #####
 
 ## Plot validité données
 #####
 laps <- c("3","6","12","60","all")
-Plot_valid <- Hydrolaps[!is.na(ID_AMOBIO_START)][, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
+Plot_valid <- Hydrolaps[, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
             paste0("NAs_",laps) := lapply(laps, function(i){length(which(is.na(get(paste0("H_Lmean_",i)))))}), by = c("Compartment", "Year")]
 Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"][
   , Mean_Ncrue := mean(H_Ncrue_all), by = "Year"]
-Plot_valid <- unique(Plot_valid[,.(Compartment,Year, Mean_Ncrue, NAs_3, NAs_6, NAs_12, NAs_60, NAs_all, MeanLap_3, MeanLap_6,
-                                   MeanLap_12, MeanLap_60, MeanLap_all)])[!is.na(Year)]
+Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) + get(paste0("SdLap_",i))/2})]
+Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) - get(paste0("SdLap_",i))/2})]
+
+Plot_valid <- unique(Plot_valid[,c("Compartment","Year", "Mean_Ncrue", grep("MeanLap|SdLap|UpLap|LowLap", names(Plot_valid), value = T)),
+                                with = F])[!is.na(Year)]
+
+long <- merge(
+  merge(melt(Plot_valid[,c("Compartment", "Year", grep("MeanLap", names(Plot_valid), value = T)), with = F], 
+             id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Mean")[, Lap := sub(".*_", "", Lap)],
+        melt(Plot_valid[,c("Compartment", "Year", grep("UpLap", names(Plot_valid), value = T)), with = F], 
+             id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Upper")[, Lap := sub(".*_", "", Lap)], 
+        by = c("Compartment", "Year", "Lap")),
+  melt(Plot_valid[,c("Compartment", "Year", grep("LowLap", names(Plot_valid), value = T)), with = F], 
+       id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Lower")[, Lap := sub(".*_", "", Lap)], 
+  by = c("Compartment", "Year", "Lap"))[!is.na(Mean)]
+
+ggplot(long, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, color = Lap, fill = Lap)) + 
+  geom_line() + geom_ribbon(alpha = 0.5)
 
 
 
+# Old
+##### 
 Plot_comp <- function(Compartment, Threshold){
   Nstat <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])
   Nperc <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])/sum(Pie_selection[Comp == Compartment, Eff_coverage])
@@ -232,7 +248,6 @@ Pie_selection <- rbind(data.table(Stations = names(Hydrolaps),
 ggarrange(plotlist = c(sapply(grep("100",ls(), value = T), get), sapply(grep("95",ls(), value = T), get),
                        sapply(grep("75",ls(), value = T), get)), ncol = 4, nrow = 3, widths = c(2,1,1,1))
 #####
-
 
 ##Cleaning data
 #####

@@ -216,7 +216,7 @@ Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("T_
 Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) + get(paste0("SdLap_",i))/2})]
 Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) - get(paste0("SdLap_",i))/2})]
 
-Plot_valid <- unique(Plot_valid[,c("Compartment","Year", "Mean_Ncrue", grep("MeanLap|SdLap|UpLap|LowLap", names(Plot_valid), value = T)),
+Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|SdLap|UpLap|LowLap", names(Plot_valid), value = T)),
                                 with = F])[!is.na(Year)]
 
 long <- merge(
