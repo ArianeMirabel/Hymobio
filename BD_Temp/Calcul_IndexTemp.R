@@ -47,6 +47,8 @@ save(Correspondance_station, file = "Temp_BioInventories_correspondance")
 load("Temp_BioInventories_correspondance")
 Temp_journaliere <- fread("C:/Users/armirabel/Documents/DB/TEMPERATURE/temperature_20220712.csv")
 
+#min = -0.5 max = 37.908
+
 Temp_journaliere <- Temp_journaliere[!is.na(Tw_corr)]
 Temp_journaliere[grep("/", Date), Samp_date := as.Date(Date, format = "%d/%m/%Y")][
   grep("-", Date), Samp_date := as.Date(Date, format = "%Y-%m-%d")][, Date := Samp_date][, Samp_date := NULL]
@@ -187,7 +189,6 @@ return(list(Temp_laps, Temp_all))
 
 })
 
-
 Templaps <- lapply(Templaps, function(si){
   if(!is.data.table(si[[1]])){return(si[[2]])
   } else {
@@ -200,7 +201,7 @@ Templaps <- Templaps[,c("ID_AMOBIO_START", "stationID", "Samp_date", grep("T_", 
 setnames(Templaps, "stationID", "CdStation")
 
 
-save(Templaps, file = "TempIndex_36125all_AM_20230817")
+save(Templaps, file = "TempIndex_36125all_AM_20230821")
 #####
 
 ##Plot validation
@@ -210,25 +211,32 @@ load("TempIndex_36125all_AM_20230817")
 laps <- c("3","6","12","60","all")
 Plot_valid <- Templaps[, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
              paste0("NAs_",laps) := lapply(laps, function(i){length(which(is.na(get(paste0("T_Lmean_",i)))))}), by = c("Compartment", "Year")]
-Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("T_Lmean_",i)), na.rm = T)}), by = "Year"][
-  , Mean_Ncrue := mean(T_Nextreme_all), by = "Year"]
-Plot_valid <- unique(Plot_valid[,.(Compartment,Year, Mean_Ncrue, NAs_3, NAs_6, NAs_12, NAs_60, NAs_all, MeanLap_3, MeanLap_6,
-                                   MeanLap_12, MeanLap_60, MeanLap_all)])
+Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("T_Lmean_",i)), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("T_Lmean_",i)), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) + get(paste0("SdLap_",i))/2})]
+Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) - get(paste0("SdLap_",i))/2})]
+
+Plot_valid <- unique(Plot_valid[,c("Compartment","Year", "Mean_Ncrue", grep("MeanLap|SdLap|UpLap|LowLap", names(Plot_valid), value = T)),
+                                with = F])[!is.na(Year)]
+
+long <- merge(
+  merge(melt(Plot_valid[,c("Compartment", "Year", grep("MeanLap", names(Plot_valid), value = T)), with = F], 
+        id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Mean")[, Lap := sub(".*_", "", Lap)],
+        melt(Plot_valid[,c("Compartment", "Year", grep("UpLap", names(Plot_valid), value = T)), with = F], 
+        id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Upper")[, Lap := sub(".*_", "", Lap)], 
+        by = c("Compartment", "Year", "Lap")),
+  melt(Plot_valid[,c("Compartment", "Year", grep("LowLap", names(Plot_valid), value = T)), with = F], 
+           id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Lower")[, Lap := sub(".*_", "", Lap)], 
+      by = c("Compartment", "Year", "Lap"))[!is.na(Mean)]
 
 
-Plot_comp <- function(Compartment, Threshold){
-  Nstat <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])
-  Nperc <- sum(Pie_selection[Comp == Compartment & Equivalent != "No overlap", Eff_coverage])/sum(Pie_selection[Comp == Compartment, Eff_coverage])
-  assign(paste0("plot", substring(Compartment,1, 3), Threshold), 
-         ggplot(Pie_selection[Comp == Compartment, .(Eff_coverage, Equivalent)],aes(x = "", y = Eff_coverage, fill = Equivalent)) +
-           geom_col(color = "black") + coord_polar(theta = "y") +
-           scale_fill_brewer(palette = "Spectral", direction=-1) +
-           theme_void() + ggtitle(paste0("\n", substring(Compartment,1, 8))) +
-           labs(subtitle = paste("N(Valid Stations) =", length(Hydrolaps_valid), "\nTime filter = ", 
-                                 round(length(Hydrolaps_valid)/length(Hydrolaps)*100, 0), "%")) +
-           theme(legend.position = "none", plot.subtitle = element_text(size = 8)) ,
-         envir = parent.frame())
-}
+ggplot(long, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, color = Lap, fill = Lap)) + 
+  geom_line() + geom_ribbon(alpha = 0.5)
+  
+
+
+
+
 
 
 

@@ -91,14 +91,14 @@ Hydro_serie <- merge(Hydro_serie, Ampli, by = "period")
 if(Tstep == 0){
   Tstep <- "all"
   Hydro_serie[, crue := resultat_obs_elab >= quantile(Hydro_serie$resultat_obs_elab, 0.9)*3][, Ncrue := length(which(crue))][
-    , crue := NULL][,code_site := code_site[1]]
+    , crue := NULL]
 }
 
 Hydro_serie <- unique(Hydro_serie[,intersect(colnames(Hydro_serie), 
-               c("code_site", "Samp_date", "period","Lmean","Lscale","Lskew", "Lkurt","corrAR1" ,"Amplitude","Phase","Ncrue")), with = F])
+               c("Samp_date", "period","Lmean","Lscale","Lskew", "Lkurt","corrAR1" ,"Amplitude","Phase","Ncrue")), with = F])
 
-setnames(Hydro_serie, setdiff(colnames(Hydro_serie), c("code_site", "Samp_date")),
-         paste0(setdiff(colnames(Hydro_serie), c("code_site", "Samp_date")), "_", Tstep))
+setnames(Hydro_serie, setdiff(colnames(Hydro_serie), c("Samp_date")),
+         paste0("H_",setdiff(colnames(Hydro_serie), c("Samp_date")), "_", Tstep))
 
 return(Hydro_serie)
 
@@ -132,6 +132,8 @@ Hydrolaps <- lapply(unique(Correspondance_station[, ID_AMOBIO_START]), function(
   if(any(Xhydro$Ndates > 1)){print(paste("Several dates in", stationBio))}
   Xhydro[,Ndates := NULL]
   
+  Xhydro[, c("code_site", "code_station") := NULL]
+  
 Hydro_laps <- tryCatch({lapply(laps, function(tstep){
   return(Index_timestep(Tstep = tstep, Hydro_Serie = Xhydro, Station = stationBio, Sampling_Date = sampling_date, 
                         Tol_threshold = tol_threshold))})},
@@ -143,7 +145,7 @@ Hydro_all <- Hydro_laps[["0"]]
 
 ifelse(any(unlist(lapply(Hydro_laps[as.character(head(laps, -1))],is.data.frame))), 
        tryCatch({
-         Hydro_laps <- Reduce(function(...) left_join(..., by = c("code_site", "Samp_date")), 
+         Hydro_laps <- Reduce(function(...) left_join(..., by = c("Samp_date")), 
         Hydro_laps[as.character(head(laps, -1))][which(unlist(lapply(Hydro_laps[as.character(head(laps, -1))],is.data.frame)))])
        },
                 warning = function(w){ print(paste(stationBio, "\n", w))}),
@@ -174,7 +176,7 @@ setnames(Hydrolaps, setdiff(colnames(Hydrolaps), c("ID_AMOBIO_START", "code_site
 Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "code_site", "Samp_date", grep("H_", colnames(Hydrolaps), value = T)), with = F]
 setnames(Hydrolaps, "code_site", "CdStation")
 
-save(Hydrolaps, file = "HydroIndex_36125all_AM_20230817")
+save(Hydrolaps, file = "HydroIndex_36125all_AM_20230818_intermediate")
 #####
 
 ## Plot validité données
