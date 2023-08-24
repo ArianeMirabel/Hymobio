@@ -2,20 +2,32 @@ source("C:/Users/armirabel/Documents/INRAE/Hymobio/Hymobio_GitHub/BD_Bio/Indices
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 
+load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
+
 directory <- paste0(getwd(), "/FinalMAJ_Naiades.Alric.Traits/")
-compartment <- "Fish"
+compartment <- "Diatom"
 slice <- 1
+
 
 invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
 
+AllInv_slice <- Split_Inv(Inventory = get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),],
+                    Slice = slice, max = 100)
 
-
-AllInv <- Split_Inv(get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),])[[slice]]
 Index_Fun <- Inventory_Functional_long(
-  Code = get(paste0("Code_",compartment))[Abbreviations %in% colnames(get(paste0("FunctionalTree_",compartment)))],
-  Inventory = AllInv, 
-  Functional_tree = get(paste0("FunctionalTree_",compartment)),
-  level = "Modalite")
+  Code = get(paste0("Code_",compartment))[Modalite %in% colnames(get(paste0("Traits_",compartment)))],
+  Inventory = AllInv_slice, 
+  Traits = get(paste0("Traits_",compartment)))[, Group := compartment]
+
+Index_Fun <- left_join(Index_Fun, 
+                       unique(as.data.table(list_station_filter5_clean)[COMPARTIMENT_START == toupper(compartment), 
+                       .(ID_AMOBIO_START, ID_START)]), by = c("CdStation" = "ID_START"))[
+            ,c("Group", "CdStation", "ID_AMOBIO_START", "Year", grep("R_|Sh_|Si_", colnames(Index_Fun), value = T)), with = F]
+
+save(Index_Fun, file = paste("Dfun", compartment, slice, sep = "_"))
+
+
+
 
 
 
