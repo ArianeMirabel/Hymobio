@@ -1,10 +1,7 @@
+#!/usr/bin/Rscript 
 invisible(lapply(c("data.table", "ggplot2", "entropart", "cluster", "dplyr", "StatMatch"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
-
-#Code_Diatom <- fread(file = paste0(getwd(),"/FinalMAJ_Naiades.Alric.Traits/Diatom_CodeTraits.csv"))
-#Code_Macroinvertebrate <- fread(file = paste0(getwd(),"/FinalMAJ_Naiades.Alric.Traits/Macroinvertebrate_CodeTraits.csv"))
-#Code_Fish <- fread(file = paste0(getwd(),"/FinalMAJ_Naiades.Alric.Traits/Fish_CodeTraits.csv"))
 
 
 load_CompartmentFiles <- function(Directory, Compartment){

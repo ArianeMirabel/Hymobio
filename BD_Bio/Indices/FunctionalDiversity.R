@@ -5,14 +5,16 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
 directory <- paste0(getwd(), "/FinalMAJ_Naiades.Alric.Traits/")
-compartment <- "Diatom"
+compartment <- "Macroinvertebrate"
 slice <- 1
 
+
+N_slices <- 5
 
 invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
 
 AllInv_slice <- Split_Inv(Inventory = get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),],
-                    Slice = slice, max = 100)
+                    Slice = slice, N_Slices = N_slices)
 
 Index_Fun <- Inventory_Functional_long(
   Code = get(paste0("Code_",compartment))[Modalite %in% colnames(get(paste0("Traits_",compartment)))],
@@ -26,6 +28,14 @@ Index_Fun <- left_join(Index_Fun,
 
 save(Index_Fun, file = paste("Dfun", compartment, slice, sep = "_"))
 
+
+lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
+  return(assign(paste0("FunctionalDiversity_", compartment),
+  do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun",
+  compartment, 1:N_slices, sep = "_"), function(file){load(file); return(Index_Fun)})
+)))
+  
+  })
 
 
 
