@@ -4,67 +4,6 @@ invisible(lapply(c("data.table", "rgeos", "sp", "dplyr", "gridExtra", "lubridate
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 
-#####
-Resume_graphique <- function(Alric, Naiades, Group){
-  
-  par(mfrow=c(2,2), mar=c(1,1,4,1))
-  Naiplot <- Nai_Station[CdStationMesureEauxSurface %in% Naiades$CdStationMesureEauxSurface]
-  coordinates(Naiplot) <- ~ CoordXStationMesureEauxSurface + CoordYStationMesureEauxSurface
-  plot(Naiplot, cex = 0.1, pch = 20, main = "All Naiades", cex.main = 0.8)
-  mtext(paste0(min(Naiades$year), " - ", max(Naiades$year), "\n", uniqueN(Naiplot$CdStationMesureEauxSurface), " Stations"), side = 3, cex = 0.6, outer = F)
-  
-  Alrplot <- Alric
-  coordinates(Alrplot) <- ~ x + y
-  plot(Alrplot, main = "All Alric", cex = 0.1, pch = 20, cex.main = 0.8)
-  mtext(paste0(min(Alrplot$year), " - ", max(Alrplot$year), "\n", uniqueN(Alric$cd_site), " Stations"), side = 3, cex = 0.6, outer = F)
-  
-  diff_Alr_Nai <- Naiades[CdStationMesureEauxSurface %in% setdiff(Naiades$CdStationMesureEauxSurface, Alric$cd_site)][year %in% Alric$year]
-  diff_Alr_Nai <- Nai_Station[CdStationMesureEauxSurface %in% diff_Alr_Nai$CdStationMesureEauxSurface]
-  coordinates(diff_Alr_Nai) <- ~ CoordXStationMesureEauxSurface + CoordYStationMesureEauxSurface
-  plot(diff_Alr_Nai, main = "In Naiades not in Alric", cex = 0.1, pch = 20, cex.main = 0.8)
-  mtext(paste0(min(Alric$year), " - ", max(Alric$year), " (same period)\n", uniqueN(diff_Alr_Nai$CdStationMesureEauxSurface), " Stations"), side = 3, cex = 0.6, outer = F)
-  
-  diff_Nai_Alr <- Alric[cd_site %in% setdiff(Alric$cd_site, Naiades$CdStationMesureEauxSurface)]
-  coordinates(diff_Nai_Alr) <- ~ x + y
-  plot(diff_Nai_Alr, main = "In Alric not in Naiades (any time)", cex = 0.1, pch = 20, cex.main = 0.8)
-  mtext(paste0(min(Alric$year), " - ", max(Alric$year), "\n", uniqueN(diff_Nai_Alr$cd_site), " Stations"), side = 3, cex = 0.6, outer = F)
-  
-  mtext(Group, side = 3, line = -1, outer = T)
-  mtext(paste(length(unique(intersect(Alric$cd_site, Naiades$CdStationMesureEauxSurface)))," common stations"), 
-        side = 3, line = -2, col = "red", outer = T, cex = 0.7)
-  
-  Naiades$Common <- "Naiades only"
-  Stack <- unique(unique(Naiades[,.(CdStationMesureEauxSurface, year, Common)])[
-    CdStationMesureEauxSurface %in% intersect(Naiades$CdStationMesureEauxSurface, Alric$cd_site), Common := "Common stations"][
-      ,.(year, Common)][, stack := .N, by = c("year","Common")])
-  
-  
-  Pstack <- ggplot(Stack, aes(x=year, y=stack, fill=Common)) + geom_area() + theme_minimal() + 
-    labs(x = "Year", y = "N stations") + ggtitle(Group) +
-    scale_fill_manual(values = c("Common stations" = "olivedrab",  "Naiades only" = "darkred")) + guides(fill = guide_legend(title=""))
-  
-  
-  PieContinue <- unique(unique(unique(Naiades[CdStationMesureEauxSurface %in% intersect(Naiades$CdStationMesureEauxSurface, 
-                               Alric$cd_site), .(CdStationMesureEauxSurface, year)])[, Continue := "Maintained"][,MaxYear := max(year),                                                                                                                                                                  by = "CdStationMesureEauxSurface"][MaxYear <= 2017, Continue := "Stopped"])[, Eff := .N, by = "Continue"][,.(Continue, Eff)])
-  
-  Ppie <- ggplot(PieContinue,aes(x = "", y=Eff, fill = Continue)) +
-    geom_col(color = "black") +
-    coord_polar(theta = "y") +
-    scale_fill_manual(values = c("Maintained" = "olivedrab",  "Stopped" = "darkred")) +
-    theme_void() + guides(fill = guide_legend(title="")) + ggtitle(Group) 
-  
-  return(list(stack = Pstack, pie = Ppie))
-}
-
-
-AlricF <- Alr_Abd_Fish
-setnames(AlricF , c("X_L93", "Y_L93","CODE_STATION"), c("x", "y", "cd_site"))
-AlricF[, year := format(as.Date(DATE, "%d/%m/%Y"), "%Y")]
-
-Resume_graphique(Alric = Alr_Abd_Diatom, Naiades = Nai_Abd_Diatom, Group = "Diatoms")
-#####
-
-
 # Macroinvertebrates
 
 #####
@@ -530,6 +469,71 @@ save(Traits_Diatom, file = "FinalMAJ_Naiades.Alric.Traits/Diatom_Traits")
 write.csv2(Traits_Diatom, row.names = F, file = "FinalMAJ_Naiades.Alric.Traits/Diatom_Traits.csv")
 #####
 
+#Resume graphique
+#####
+#####
+Nai_Station <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
+                                      sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
+Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
+Nai_Station <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")),]
+
+Alr_Diatom <- fread("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/3_DIATOMS/AMOBIO_DIAT_RLQtable.csv",encoding="Latin-1")
+Alr_Fish <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/2_FISHES/AMOBIO_FISH_Abundance.csv",sep=";"))
+Alr_Fish <- Alr_Fish[!is.na(X_L93)]
+Alr_Fish <- Alr_Fish[!is.na(CODE_STATION),]
+setnames(Alr_Fish, c("CODE_STATION", "X_L93", "Y_L93"),c("cd_site", "x", "y")) 
+
+Alr_Macroinvertebrate <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/BIOLOGICAL_TRAITS_TREATMENTS/1_MACROINVERTEBRATES/2_BASE_AMOBIO/AMOBIO_INV_RLQtable.csv",sep=";"))
+Alr_Macroinvertebrate <- Alr_Macroinvertebrate[!is.na(x)]
+Alr_Macroinvertebrate <- Alr_Macroinvertebrate[,1:(grep("m",colnames(Alr_Macroinvertebrate))[1]-1), with = FALSE]
+
+directory <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/"
+files <- list.files(directory)
+lapply(paste0(directory,files[setdiff(grep("Inventories", files),grep(".csv", files))])
+       , load, .GlobalEnv)
+  
+Resume_graphique <- function(Inventory, Group){
+  
+   Naiplot <- Nai_Station[CdStationMesureEauxSurface %in% get(paste0("AllInv_", Group))[BDsource == "Naiades", CdStation]][
+    , .(CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface)][, BDsource := "Naiades"]
+  setnames(Naiplot, c("CoordXStationMesureEauxSurface", "CoordYStationMesureEauxSurface"), c("x", "y"))
+  
+  Alrplot <- get(paste0("Alr_", Group))[cd_site %in% get(paste0("AllInv_", Group))[BDsource == "Alric", CdStation]][
+    , .(x,y)][, BDsource := "Alric"]
+  
+  Commonplot <- Nai_Station[CdStationMesureEauxSurface %in% get(paste0("AllInv_", Group))[BDsource == "Naiades+Alric", CdStation]][
+    , .(CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface)][, BDsource := "Naiades+Alric"]
+  setnames(Commonplot,c("CoordXStationMesureEauxSurface", "CoordYStationMesureEauxSurface"), c("x", "y"))
+  
+  plotmap <-  rbind(Naiplot, Alrplot, Commonplot)[
+    , BDsource := factor(BDsource, levels = c("Naiades+Alric", "Naiades", "Alric"))]
+  
+  pmap <- ggplot(data = plotmap, aes(x=x, y=y, color = BDsource)) +
+    geom_point() + labs(x="", y="", title = Group, color = NULL) + 
+    theme(axis.ticks.y = element_blank(),axis.text.y = element_blank(),
+          axis.ticks.x = element_blank(),axis.text.x = element_blank(), 
+          panel.background = element_blank(),
+          plot.title = element_text(lineheight=.8, face="bold", vjust=1))
+    
+  plotNstation <- get(paste0("AllInv_", Group))[, .(Year, CdStation, BDsource)]
+  plotNstation <- unique(plotNstation[, Nyear := .N, by = c("BDsource", "Year")][, CdStation := NULL])[
+    , BDsource := factor(BDsource, levels = c("Naiades+Alric", "Naiades", "Alric"))]
+  
+  pNstat <- ggplot(data = plotNstation, aes(x = Year, y = Nyear, group = BDsource, color = BDsource)) +
+    geom_line() + labs(y = "N operations", color = NULL) + theme_light() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) #+
+    #scale_x_discrete(breaks = seq(min(plotNstation$Year),max(plotNstation$Year), length.out = 15))
+  
+  grid.arrange(pmap, pNstat, nrow = 1)
+  
+}
+
+group = "Diatom"
+Resume_graphique(Inventory = get(paste0("AllInv_", group)), Group = group)
+#####
+
+#####
+
 
 # Overview 
 load("FinalMAJ_Naiades.Alric.Traits/Macroinvertebrate_Traits")
@@ -563,7 +567,7 @@ SumUp <- as.data.frame(t(data.frame("Discarded" = sum(AllInv_Macroinvertebrate[N
 colnames(SumUp) <- "Eff"
 SumUp$groups <- factor(rownames(SumUp), levels = c("Discarded", "Matching", "No_Traits","Substitute_Traits", "Both", "Naiades", "Alric"))
 
-p1m <-ggplot(SumUp[1:4,],aes(x = "", y = Eff, fill = groups)) +
+p1m <- ggplot(SumUp[1:4,],aes(x = "", y = Eff, fill = groups)) +
   geom_col(color = "black") +
   coord_polar(theta = "y") +
   scale_fill_viridis_d() + theme_void() + 
@@ -575,9 +579,9 @@ p2m <- ggplot(SumUp[5:7,],aes(x = "", y = Eff, fill = groups)) +
   scale_fill_viridis_d() + theme_void() + 
   guides(fill = guide_legend(title="")) 
 #####
+
 # Diatom
 #####
-
 SumUp <- as.data.frame(t(data.frame("Substitute_Traits" = sum(AllInv_Diatom[NomLatin_Simple %in% Correspondances_Diatom[grep("Holotype|common|Basionym", Replacement_type)
                                                                           , NomLatin_Simple] & NomLatin_Join != "Unmatched", Abundance]),
                                     "No_Traits" = sum(AllInv_Diatom[!NomLatin_Simple %in% Correspondances_Diatom[Replacement_type == "Too large", NomLatin_Simple] 
@@ -638,11 +642,10 @@ ggarrange(p1d, p2d, p1m, p2m, p1f, p2f, ncol= 2, nrow = 3, widths = c(4,3))
 
 
 # Single species inventories
-SingleCheck <- rbind(unique(AllInv_Diatom[, Nsp := .N, by = c("CdStation", "Year", "Group")][
-  , .(Group, CdStation, Year, Nsp)]),
-  unique(AllInv_Macroinvertebrate[, Nsp := .N, by = c("CdStation", "Year", "Group")][, .(Group, CdStation, Year, Nsp)]),
-  unique(AllInv_Fish[, Nsp := .N, by = c("CdStation", "Year", "Group")][, .(Group, CdStation, Year, Nsp)])
-  )
+SingleCheck <- do.call(rbind, lapply(c("Fish", "Macroinvertebrate", "Diatom"), function(group){
+  return(unique(get(paste0("AllInv_", group))[, Nsp := uniqueN(NomLatinAppelTaxon), by = c("CdStation", "Year", "Group")][
+  , .(Group, CdStation, Year, Nsp)]))}))
+SingleCheck <- SingleCheck[Nsp == 1]
 Effectifs <- unique(SingleCheck[,Ngrp := .N, by = c("Nsp", "Group")][,.(Ngrp,Nsp, Group)])[,Pgrp := round(Ngrp/sum(Ngrp),3), by = Group]
 Effectifs[Pgrp > 0.01]
 

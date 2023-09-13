@@ -4,9 +4,10 @@ invisible(lapply(c("data.table", "ggplot2", "entropart"),function(pk){
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 
-dir <- "C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/FinalMAJ_Naiades.Alric.Traits/"
+dir <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/"
 files <- list.files(dir)
 lapply(paste0(dir,files[setdiff(grep("_Inventories", files),grep(".csv", files))]), load, .GlobalEnv)
+load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
 #Old, lapply version
 #####
@@ -51,10 +52,23 @@ Inventory_taxo <- function(Inv){
     , c("Nspecies", Inds, "Bias_Estimator") := c(uniqueN(NomTaxo), Indexes_measure(Abundance)), 
     by = c("CdStation","Year")][ ,.(Group, CdStation, Year, Nspecies, Richness, Shannon, Simpson)])
   Inv[Richness == Inf, Richness := Nspecies]
+  
+  Inv <- merge(Inv, 
+            unique(as.data.table(list_station_filter5_clean)[COMPARTIMENT_START == toupper(unique(Inv$Group)), 
+                   .(ID_AMOBIO_START, ID_START)]), by.x = "CdStation", by.y = "ID_START", all.x = T)[
+          ,c("Group", "CdStation", "ID_AMOBIO_START", "Year", "Nspecies", "Richness", "Shannon", "Simpson"), with = F]
+  
   return(Inv)
 }
 
-Index_Taxo_Diatom <- Inventory_taxo(AllInv_Diatom)
+Index_Taxo <- lapply(c("Fish", "Macroinvertebrate", "Diatom"), function(compartment){
+  assign(paste0("DiversityTaxo_", compartment), Inventory_taxo(Inv = get(paste0("AllInv_", compartment))))
+  save(list = paste0("DiversityTaxo_", compartment), 
+       file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/DiversityTaxonomic_", compartment))
+  })
+
+
+Index_Taxo_Diatom <- Inventory_taxo(Inv = AllInv_Diatom)
 save(Index_Taxo_Diatom, file = "TaxonomicBiodiv_Diatom")
 
 Index_Taxo_Macroinvertebrate <- Inventory_taxo(AllInv_Macroinvertebrate)

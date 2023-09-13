@@ -5,7 +5,7 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
 directory <- paste0(getwd(), "/FinalMAJ_Naiades.Alric.Traits/")
-compartment <- "Macroinvertebrate"
+compartment <- "Diatom"
 slice <- 1
 
 
@@ -28,17 +28,36 @@ Index_Fun <- left_join(Index_Fun,
 
 save(Index_Fun, file = paste("Dfun", compartment, slice, sep = "_"))
 
-
+#Save functional
+#####
 lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
-  assign(paste0("FunctionalDiversity_", compartment),
+  assign(paste0("DiversityFunctional_", compartment),
   do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun",
   compartment, 1:N_slices, sep = "_"), function(file){load(file); return(Index_Fun)})
 ))
-  save(list = paste0("FunctionalDiversity_", compartment), 
-  file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun_tot_", compartment))
+  save(list = paste0("DiversityFunctional_", compartment), 
+  file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_", compartment))
 
   })
+#####
 
+#Save all
+#####
+lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
+  
+  load(paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/DiversityTaxonomic_", compartment))
+  
+  Fun <- do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun",
+                                     compartment, 1:N_slices, sep = "_"), function(file){load(file); return(Index_Fun)}))
+  
+  assign(paste0("Biodiversity_", compartment), merge(Fun, get(paste0("DiversityTaxo_", compartment))[, .(CdStation, Year, Nspecies, Richness, Shannon, Simpson)], 
+                                                    by = c("CdStation", "Year"), all = T))
+  
+  save(list = paste0("Biodiversity_", compartment), 
+       file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Biodiversity_", compartment))
+  
+})
+#####
 
 #####
 
@@ -117,39 +136,59 @@ ggplot(Toplot, aes(x = Year, y = Mean, group = Index, color = Index, fill = Inde
 
 Toplot <- lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
   return(assign(paste0("FunctionalDiversity_", compartment),
-         do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun",
+         do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Biodiversity",
                                      compartment, 1:N_slices, sep = "_"), function(file){load(file); return(Index_Fun)})
          )))
 })
 
-toplot <- Toplot[[1]][, c("Group", "CdStation", "ID_AMOBIO_START", "Year", "R_all", "Sh_all", "Si_all"), with = F]
 
-toplot[, as.vector(outer(c("Mean", "Up", "Low"), grep("_al", colnames(toplot), value = T), paste0)) := 
-         do.call(c,lapply(.SD, function(x) {list(mean = mean(x, na.rm = T), 
-                                                 up = mean(x, na.rm = T)+sd(x, na.rm = T)/2, 
-                                                 low = mean(x, na.rm = T)-sd(x, na.rm = T)/2)})),
-       .SDcols = grep("_all", colnames(toplot), value = T), by =  "Year"]
-toplot <- melt(toplot, 
-               measure = list(grep("Mean", colnames(toplot), value = T), grep("Up", colnames(toplot), value = T), grep("Low", colnames(toplot), value = T)), 
-               value.name = c("Mean", "Up", "Low"), variable.name = "Index", variable.factor = F)
-toplot[, Index := gsub("1", "Richness", gsub("2", "Shannon", gsub("3", "Simpson", Index)))]
+Toplot <- lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
+  load(paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Biodiversity_",
+              compartment))
+  return(get(paste0("Biodiversity_", compartment))[,.(CdStation, Year, Group, ID_AMOBIO_START, 
+                                                      R_all, Sh_all, Si_all, Nspecies, Richness, Shannon, Simpson)])})
+names(Toplot) <- c("Fish", "Macroinvertebrate", "Diatom")
+Toplot[["Fish"]][,Year := as.numeric(Year)]
 
-ggplot(toplot, aes(x = Year, y = Mean, group = Index, color = Index, fill = Index)) +
-  geom_line() + scale_x_discrete(breaks = seq(min(toplot$Year), max(toplot$Year), by = 5)) +
-  geom_ribbon(aes(ymax = Up, ymin = Low), color = "grey", alpha = 0.3) + 
-  theme(axis.text.x = element_text(angle = 45, hjust=1)) + ylab("Stations Mean")
+library(grid)
+library(gridExtra)
+plot_Biodiv <- function(Compartment, Inds, type){
+  toplot <- Toplot[[Compartment]][, c("Group", "CdStation", "ID_AMOBIO_START", "Year", Inds), with = F]
+  
+  toplot[, as.vector(outer(c("Mean", "Up", "Low"), Inds, paste0)) := 
+           do.call(c,lapply(.SD, function(x) {list(mean = mean(x, na.rm = T), 
+                                                   up = mean(x, na.rm = T)+sd(x, na.rm = T)/2, 
+                                                   low = mean(x, na.rm = T)-sd(x, na.rm = T)/2)})),
+         .SDcols = Inds, by =  "Year"]
+  toplot <- melt(toplot, 
+                 measure = list(grep("Mean", colnames(toplot), value = T), grep("Up", colnames(toplot), value = T), grep("Low", colnames(toplot), value = T)), 
+                 value.name = c("Mean", "Up", "Low"), variable.name = "Index", variable.factor = F)
+  toplot[, Index := gsub("1", "Richness", gsub("2", "Shannon", gsub("3", "Simpson", Index)))]
+  
+  lgd <- (type == "Functional" & Compartment == "Macroinvertebrate")
+  plot <- ggplot(toplot, aes(x = Year, y = Mean, group = Index, color = Index, fill = Index)) +
+    geom_line(show.legend = lgd) + scale_x_continuous(breaks = seq(min(toplot$Year), max(toplot$Year), by = 5)) +
+    geom_ribbon(aes(ymax = Up, ymin = Low), color = "grey", alpha = 0.3, show.legend = lgd) + 
+    theme(axis.text.x = element_text(angle = 45, hjust=1)) + ylab("Stations Mean") 
+  if(type == "Functional"){plot <- plot + theme(axis.title.y = element_blank())}
+  if(Compartment == "Fish"){ plot <- plot + ggtitle(paste(type, "Diversity"))}
+  if(Compartment != "Diatom"){ plot <- plot + theme(axis.title.x = element_blank(), axis.text.x = element_blank()) }
+  
+  return(plot)
+}
 
 
+plot <- lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
+  
+  fun <- plot_Biodiv(Compartment = compartment, Inds = c("R_all", "Sh_all", "Si_all"), type = "Functional")
+  
+  taxo <- plot_Biodiv(Compartment = compartment, Inds = c("Richness", "Shannon", "Simpson"), type = "Taxonomic")
 
-Toplot <- Toplot[data.table(IndName = Inds, Index = as.character(1:3)), on = "Index", Index := i.IndName]
-Toplot[is.finite(mean), quant075 := quantile(mean, .75), by = c("Group", "Index")]
-Toplot <- Toplot[is.finite(mean) & mean < quant075]
+grid.arrange(taxo, fun, nrow = 1,  top = textGrob(compartment,gp=gpar(fontsize=20,font=3)), 
+             widths = c(2,3))
+})
 
 
-ggplot(Toplot, aes(x = Year, y = mean, group = Group, color = Group, fill = Group)) +
-  geom_line() + scale_x_discrete(breaks = seq(min(Toplot$Year), max(Toplot$Year), by = 5)) +
-  geom_ribbon(aes(ymax = up, ymin = low), color = "grey", alpha = 0.3) + facet_wrap( ~ Index, scales = "free") +
-  theme(axis.text.x = element_text(angle = 45, hjust=1)) + ylab("Stations Mean")
 
 
 lapply(grep("TaxonomicBiodiv_", list.files(), value = T), load, .GlobalEnv)

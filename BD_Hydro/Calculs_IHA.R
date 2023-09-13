@@ -178,19 +178,20 @@ save(Hydrolaps, file = "HydroIndex_36125all_AM_20230821")
 
 ## Plot validité données
 #####
-laps <- c("3","6","12","60","all")
+laps <- c("3","6","12","60")
 Plot_valid <- Hydrolaps[, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
-            paste0("NAs_",laps) := lapply(laps, function(i){length(which(is.na(get(paste0("H_Lmean_",i)))))}), by = c("Compartment", "Year")]
+            paste0("Nstation_",laps) := lapply(laps, function(i){uniqueN(ID_AMOBIO_START)}), by = "Year"]
 Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"][
   , Mean_Ncrue := mean(H_Ncrue_all), by = "Year"]
 Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"]
 Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) + get(paste0("SdLap_",i))/2})]
 Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) - get(paste0("SdLap_",i))/2})]
 
-Plot_valid <- unique(Plot_valid[,c("Compartment","Year", "Mean_Ncrue", grep("MeanLap|SdLap|UpLap|LowLap", names(Plot_valid), value = T)),
+Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|SdLap|UpLap|LowLap|Nstation", names(Plot_valid), value = T)),
                                 with = F])[!is.na(Year)]
 
 long <- merge(
+  merge(
   merge(melt(Plot_valid[,c("Compartment", "Year", grep("MeanLap", names(Plot_valid), value = T)), with = F], 
              id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Mean")[, Lap := sub(".*_", "", Lap)],
         melt(Plot_valid[,c("Compartment", "Year", grep("UpLap", names(Plot_valid), value = T)), with = F], 
@@ -198,10 +199,43 @@ long <- merge(
         by = c("Compartment", "Year", "Lap")),
   melt(Plot_valid[,c("Compartment", "Year", grep("LowLap", names(Plot_valid), value = T)), with = F], 
        id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Lower")[, Lap := sub(".*_", "", Lap)], 
-  by = c("Compartment", "Year", "Lap"))[!is.na(Mean)]
+  by = c("Compartment", "Year", "Lap")),
+  melt(Plot_valid[,c("Compartment", "Year", grep("Nstation", names(Plot_valid), value = T)), with = F], 
+       id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Nstation")[, Lap := sub(".*_", "", Lap)], 
+        by = c("Compartment", "Year", "Lap"))[!is.na(Mean)]
+long[, Lap := factor(Lap, levels = c("3","6","12","60","all"))]
 
-ggplot(long, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, color = Lap, fill = Lap)) + 
-  geom_line() + geom_ribbon(alpha = 0.5)
+
+labs <- c("3 months" , "6 months", "1 year","5 years");
+vals <- c("firebrick" , "darkorange", "olivedrab3","royalblue")
+pMean <- ggplot(long) + 
+  geom_line(aes(x = Year, y = Mean, group = Lap, color = Lap)) + 
+  geom_ribbon(alpha = 0.2, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, fill = Lap)) + 
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+  labs(y = "Mean (l/s)") + scale_fill_manual(name = "Lap", labels = labs, values =  vals) +   
+  scale_color_manual(name = "Lap", labels = labs, values =  vals)
+
+
+pN <- ggplot(long, aes(x = Year, y = Nstation, group = Lap, color = Lap), show.legend = F) +
+  geom_line(show.legend =  F) + theme_minimal() + ylab("N\nStations") +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
+  scale_y_continuous(breaks = seq(0, 600, by = 200)) +
+  scale_color_manual(name = "Lap", labels = labs, values =  vals)
+
+
+ggarrange(pN, pMean, ncol = 1, common.legend = T, heights = c(1,3), 
+          legend = "right")
+
+
+
+
+
+
+
+
+
+
+
 
 
 
