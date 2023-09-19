@@ -152,6 +152,7 @@ Toplot[["Fish"]][,Year := as.numeric(Year)]
 
 library(grid)
 library(gridExtra)
+library(cowplot)
 plot_Biodiv <- function(Compartment, Inds, type){
   toplot <- Toplot[[Compartment]][, c("Group", "CdStation", "ID_AMOBIO_START", "Year", Inds), with = F]
   
@@ -167,12 +168,13 @@ plot_Biodiv <- function(Compartment, Inds, type){
   
   lgd <- (type == "Functional" & Compartment == "Macroinvertebrate")
   plot <- ggplot(toplot, aes(x = Year, y = Mean, group = Index, color = Index, fill = Index)) +
-    geom_line(show.legend = lgd) + scale_x_continuous(breaks = seq(min(toplot$Year), max(toplot$Year), by = 5)) +
-    geom_ribbon(aes(ymax = Up, ymin = Low), color = "grey", alpha = 0.3, show.legend = lgd) + 
-    theme(axis.text.x = element_text(angle = 45, hjust=1)) + ylab("Stations Mean") 
+    geom_line(show.legend = lgd) + scale_x_continuous(breaks = seq(2005, 2020, by = 5)) +
+    geom_ribbon(aes(ymax = Up, ymin = Low), color = "grey", alpha = 0.3, show.legend = lgd) + ylab("Stations Mean") + 
+    theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position = "none")
+    
   if(type == "Functional"){plot <- plot + theme(axis.title.y = element_blank())}
   if(Compartment == "Fish"){ plot <- plot + ggtitle(paste(type, "Diversity"))}
-  if(Compartment != "Diatom"){ plot <- plot + theme(axis.title.x = element_blank(), axis.text.x = element_blank()) }
+  if(Compartment != "Diatom"){ plot <- plot + theme(axis.title.x = element_blank())}
   
   return(plot)
 }
@@ -183,11 +185,18 @@ plot <- lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
   fun <- plot_Biodiv(Compartment = compartment, Inds = c("R_all", "Sh_all", "Si_all"), type = "Functional")
   
   taxo <- plot_Biodiv(Compartment = compartment, Inds = c("Richness", "Shannon", "Simpson"), type = "Taxonomic")
-
-grid.arrange(taxo, fun, nrow = 1,  top = textGrob(compartment,gp=gpar(fontsize=20,font=3)), 
-             widths = c(2,3))
+  
+return(list(textGrob(compartment,gp=gpar(fontsize=20,font=3)), taxo, fun))
 })
 
+g <- ggplotGrob(plot[[2]][[3]] + theme(legend.position = "right"))$grobs
+legend <- g[[which(sapply(g, function(x) x$name) == "guide-box")]]
+lwidth <- sum(legend$width)
+
+
+grid.draw(arrangeGrob(arrangeGrob(grobs = do.call(c,plot), layout_matrix = matrix(c(1,1,2,3,4,4,5,6,7,7,8,9),ncol=2, byrow=T),
+             heights = c(1,5,1,5,1,5)), legend, ncol = 2,
+            widths = unit.c(unit(1, "npc") - lwidth, lwidth)))
 
 
 

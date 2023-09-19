@@ -2,15 +2,15 @@ invisible(lapply(c("data.table", "rgeos", "sp", "dplyr", "gridExtra", "lubridate
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("../../DataBase_treatment/BD_Bio")
+setwd("../DataBase_treatment/BD_Bio")
 
 ### Naiades DB
-Nai_Station <- as.data.table(read.csv("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
+Nai_Station <- as.data.table(read.csv("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/stations.csv", 
                sep=";"))[,.(CdStationMesureEauxSurface, CoordXStationMesureEauxSurface, CoordYStationMesureEauxSurface, CodeRegion, LbRegion)]
 Stations_metropole <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")), CdStationMesureEauxSurface]
 Nai_Station <- Nai_Station[!(LbRegion %in% c("", "La Réunion", "Martinique", "Guyane")),]
 
-Nai_Abd <- fread(paste0("../../../../DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/fauneflore.csv"))[
+Nai_Abd <- fread(paste0("C:/Users/armirabel/Documents/DB/1_MISE_A_JOUR_DONNEES_BIOLOGIQUE/HYDROBIOLOGIE NAIADE (ne pas modifier)/fauneflore.csv"))[
   MnTypTaxRep == "NbrTax"][MnemoRqNbrTaxRep == "Domaine de validité"][LbSupport %in% c("Poissons", "Macroinvertébrés aquatiques","Diatomées benthiques")]
 
 Nai_Abd[, Correction := as.numeric(Nai_Abd$CdStationMesureEauxSurface)][, Correction := as.character(Correction)]
