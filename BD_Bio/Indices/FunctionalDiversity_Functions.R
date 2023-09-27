@@ -47,17 +47,21 @@ Split_Inv <- function(Inventory, Slice, N_Slices){
    return(Inventory[CdStation %in% SplitList[[Slice]]])}
 
 
-Indexes_measure_fun <- function(Abce, Names, Dissim){
+Indexes_measure_fun <- function(Abce, Names, Dissim, Hill){
   
-  ret <- tryCatch({lapply(0:2, function(Q){round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
-                                                          Dissim, Correction = "None"), q=Q),2)})},
+  ret <- tryCatch({lapply(0:2, function(Q){
+    ifelse(Hill,round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
+                Dissim, Correction = "None"), q=Q),2),
+           round(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
+                          Dissim, Correction = "None"),2))
+    })},
                   
                   error = function(e) {print(e)})
   return(ret)
 }
 
 
-Inventory_Functional_long <- function(Code, Inventory, Traits) {
+Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
   
   Functional_tree <- unique(Traits)[, c("CdAppelTaxon", grep(paste(Code$Trait, collapse = "|"), colnames(Traits), value = T)),
                                     with = F]
@@ -77,7 +81,7 @@ Inventory_Functional_long <- function(Code, Inventory, Traits) {
         dissim_trait <- 1 - dissim_trait/max(dissim_trait)
         
         Inv[, paste0(c("R_Mod_", "Sh_Mod_", "Si_Mod_"), modalite) := Indexes_measure_fun(Abce = Abundance, Names = CdAppelTaxon_Join, 
-             Dissim = dissim_trait), by = c("CdStation","Year")]
+             Dissim = dissim_trait, Hill = hill), by = c("CdStation","Year")]
         
         return(unique(Inv[ ,c("CdStation", "Year", grep(modalite, colnames(Inv), value = T)), with = F]))
         })

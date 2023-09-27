@@ -208,15 +208,23 @@ save(Templaps, file = "TempIndex_36125all_AM_20230821")
 #####
 load("TempIndex_36125all_AM_20230821")
 
-laps <- c("3","6","12","60")
-Plot_valid <- Templaps[, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
-             paste0("Nstation_",laps) := lapply(laps, function(i){uniqueN(stationID)}), by = "Year"]
-Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("T_Lmean_",i)), na.rm = T)}), by = "Year"]
-Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("T_Lmean_",i)), na.rm = T)}), by = "Year"]
-Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) + get(paste0("SdLap_",i))/2})]
-Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) - get(paste0("SdLap_",i))/2})]
+Stat_Turn <- function(yr){
+  uniqueN(setdiff(Turnover[Year == as.numeric(yr), stationID],Turnover[Year == as.numeric(yr)-1, stationID])) +
+    uniqueN(setdiff(Turnover[Year == as.numeric(yr)-1, stationID],Turnover[Year == as.numeric(yr), stationID])) 
+}
 
-Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|SdLap|UpLap|LowLap|Nstation", names(Plot_valid), value = T)),
+laps <- c("3","6","12","60")
+Plot_valid <- Templaps[stationID != "4044700"][, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
+             paste0("Nstation_",laps) := lapply(laps, function(i){uniqueN(stationID)}), by = "Year"]
+
+Turnover <- unique(Plot_valid[Year > 2008,.(stationID, Year)])
+Turnover <- unique(Turnover[, StatTurn := Stat_Turn(Year), by = "Year"][,.(Year, StatTurn)])[order(Year), Year := as.numeric(Year)]
+
+Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){median(get(paste0("T_Lmean_",i)), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){quantile(get(paste0("T_Lmean_",i)), probs = 0.6, na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){quantile(get(paste0("T_Lmean_",i)), probs = 0.4, na.rm = T)}), by = "Year"]
+
+Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|UpLap|LowLap|Nstation", names(Plot_valid), value = T)),
                                 with = F])[!is.na(Year)]
 
 long <- merge(
@@ -234,13 +242,6 @@ long <- merge(
   by = c("Compartment", "Year", "Lap"))[!is.na(Mean)][Year > 2008]
 long[, Lap := factor(Lap, levels = c("3","6","12","60","all"))]
 
-ggplot(long) + 
-  geom_line(aes(x = Year, y = Mean, group = Lap, color = Lap), show.legend = F) + 
-  geom_ribbon(alpha = 0.2, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, fill = Lap)) + 
-  theme_minimal() + labs(y = "Mean (°C)") +
-scale_fill_discrete(name = "Lap", labels = c("3 months" , "6 months", "1 year","5 years","Allserie"))
-
-
 labs <- c("3 months" , "6 months", "1 year","5 years");
 vals <- c("firebrick" , "darkorange", "olivedrab3","royalblue")
 pMean <- ggplot(long) + 
@@ -248,18 +249,19 @@ pMean <- ggplot(long) +
   geom_ribbon(alpha = 0.2, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, fill = Lap)) + 
   theme_minimal() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
   labs(y = "Mean (°C)") + scale_fill_manual(name = "Lap", labels = labs, values =  vals) +   
-  scale_color_manual(name = "Lap", labels = labs, values =  vals)
+  scale_color_manual(name = "Lap", labels = labs, values =  vals) + ggtitle("(b)")
 
-
-pN <- ggplot(long, aes(x = Year, y = Nstation, group = Lap, color = Lap), show.legend = F) +
-  geom_line(show.legend =  F) + theme_minimal() + ylab("N\nStations") +
+pN <- ggplot() + theme_minimal() + ylab("N\nStations") +
+  geom_col(data = Turnover[Year > 2009], aes(x = Year, y = StatTurn, fill = "Turnover")) +
+  geom_line(data = long, aes(x = Year, y = Nstation, group = Lap, color = Lap), size = 2, show.legend = F) +
   theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
-  scale_color_manual(name = "Lap", labels = labs, values =  vals)
+  scale_color_manual(name = "Lap", labels = labs, values =  vals) + ggtitle("(a)") +
+  scale_fill_manual(name = "Turnover", label="N new station", values = c("Turnover" = "darkgrey")) 
 
-
-ggarrange(pN, pMean, ncol = 1, common.legend = T, heights = c(1,3), 
+ggarrange(pN, pMean, ncol = 1, common.legend = F, heights = c(1,3), 
           legend = "right")
 
 
-
+barplot <- Turnover[, Nyrs := uniqueN(Year), by = stationID][order(Nyrs),.(Nyrs)]
+ggplot(barplot, aes(Nyrs)) + geom_bar() + theme_minimal()
 

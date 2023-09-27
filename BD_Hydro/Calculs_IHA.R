@@ -178,14 +178,15 @@ save(Hydrolaps, file = "HydroIndex_36125all_AM_20230821")
 
 ## Plot validité données
 #####
+load("HydroIndex_36125all_AM_20230821")
 laps <- c("3","6","12","60")
 Plot_valid <- Hydrolaps[, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
             paste0("Nstation_",laps) := lapply(laps, function(i){uniqueN(ID_AMOBIO_START)}), by = "Year"]
-Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){mean(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"][
+Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){median(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"][
   , Mean_Ncrue := mean(H_Ncrue_all), by = "Year"]
 Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"]
-Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) + get(paste0("SdLap_",i))/2})]
-Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){get(paste0("MeanLap_",i)) - get(paste0("SdLap_",i))/2})]
+Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){quantile(get(paste0("H_Lmean_",i)), probs = 0.6, na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){quantile(get(paste0("H_Lmean_",i)), probs = 0.4, na.rm = T)}), by = "Year"]
 
 Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|SdLap|UpLap|LowLap|Nstation", names(Plot_valid), value = T)),
                                 with = F])[!is.na(Year)]
@@ -213,13 +214,13 @@ pMean <- ggplot(long) +
   geom_ribbon(alpha = 0.2, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, fill = Lap)) + 
   theme_minimal() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
   labs(y = "Mean (l/s)") + scale_fill_manual(name = "Lap", labels = labs, values =  vals) +   
-  scale_color_manual(name = "Lap", labels = labs, values =  vals)
+  scale_color_manual(name = "Lap", labels = labs, values =  vals) + ggtitle("(b)")
 
 
 pN <- ggplot(long, aes(x = Year, y = Nstation, group = Lap, color = Lap), show.legend = F) +
   geom_line(show.legend =  F) + theme_minimal() + ylab("N\nStations") +
   theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
-  scale_y_continuous(breaks = seq(0, 600, by = 200)) +
+  scale_y_continuous(breaks = seq(0, 600, by = 200)) + ggtitle("(a)") +
   scale_color_manual(name = "Lap", labels = labs, values =  vals)
 
 
