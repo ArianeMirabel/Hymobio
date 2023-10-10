@@ -643,7 +643,7 @@ ggarrange(p1d, p2d, p1m, p2m, p1f, p2f, ncol= 2, nrow = 3, widths = c(4,3))
 
 # Single species inventories
 SingleCheck <- do.call(rbind, lapply(c("Fish", "Macroinvertebrate", "Diatom"), function(group){
-  return(unique(get(paste0("AllInv_", group))[, Nsp := uniqueN(NomLatinAppelTaxon), by = c("CdStation", "Year", "Group")][
+  return(unique(get(paste0("AllInv_", group))[, Nsp := uniqueN(NomLatinAppelTaxon), by = c("CdStation", "Group")][
   , .(Group, CdStation, Year, Nsp)]))}))
 SingleCheck <- SingleCheck[Nsp == 1]
 Effectifs <- unique(SingleCheck[,Ngrp := .N, by = c("Nsp", "Group")][,.(Ngrp,Nsp, Group)])[,Pgrp := round(Ngrp/sum(Ngrp),3), by = Group]
@@ -666,6 +666,12 @@ AllInv_Fish[CdStation %in% SingleCheck[Nsp == 1 & Group == "Fish", CdStation]][,
 
 SingleSpeciesStations <- SingleCheck[Nsp == 1 & Group == "Fish", CdStation]
 save(SingleSpeciesStations, file = "../BD_Hydro/CheckSingleSpeciesStations")
+
+
+SingleFishes <- unique(unique(AllInv_Fish[CdStation %in% SingleCheck$CdStation, .(CdStation, NomLatinAppelTaxon)])[
+  , Noccurence := .N, by = NomLatinAppelTaxon][,.(NomLatinAppelTaxon, Noccurence)])
+
+
 
 
 
