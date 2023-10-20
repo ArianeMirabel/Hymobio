@@ -145,6 +145,48 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
 
 
 
+Inventory_TraitsFrequencies <- function(Code, Inventory, Traits, hill = TRUE) {
+  
+  Functional_tree <- unique(Traits)[, c("CdAppelTaxon", grep(paste(Code$Trait, collapse = "|"), colnames(Traits), value = T)),
+                                    with = F]
+  
+  pb <- txtProgressBar(min = 0, max = uniqueN(Code$Trait)*2 + 1, style = 3)
+  
+  Indices_Modalite <- lapply(unique(Code$Trait), function (trait) {
+    
+    ret <- lapply(Code[Trait == trait, Modalite], function(modalite){
+      
+      Tree <- Functional_tree[, c("CdAppelTaxon",modalite), with = F][, (modalite) := lapply(.SD, function(i){i[is.na(i)] <- 0; i}), 
+                                                    .SDcols = modalite]
+      
+      Inv <- merge(Inventory[,.(CdStation, Year, CdAppelTaxon, Abundance)], Tree, by = "CdAppelTaxon", all.x = T, all.y = F)
+      Inv[, Freq := Abundance/sum(Abundance), by = c("CdStation","Year")]
+      
+      Inv[, paste0("N_", modalite) := sum(Abundance * as.numeric(get(modalite))), by = c("CdStation","Year")][
+          , paste0("Freq_", modalite) := sum(Freq * as.numeric(get(modalite))), by = c("CdStation","Year")]
+      
+      return(unique(Inv[ ,c("CdStation", "Year", paste0("N_", modalite), paste0("Freq_", modalite)), with = F]))
+    })
+    
+    setTxtProgressBar(pb, which(unique(Code$Trait) == trait))
+    
+    ret <- tryCatch({
+      Reduce(function(...) merge(..., by = c("CdStation", "Year"), all =T), ret)},
+      warning = function(w) {print(paste(w, "\n", "On trait", trait))},
+      error = function(e) {print(paste(e, "\n", "On trait", trait))})
+    
+    return(ret)
+    
+  })
+  
+  Indices_Modalite <- tryCatch({
+    Reduce(function(...) merge(..., by = c("CdStation", "Year")), Indices_Modalite)},
+    warning = function(w){ print(paste(w, "\n", "On Modalite"))},
+    error = function(e){ print(paste(e, "\n", "On Modalite"))})
+
+  
+  return(Indices_Modalite)}
+
 
 
 
