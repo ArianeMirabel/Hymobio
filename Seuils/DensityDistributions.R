@@ -46,7 +46,7 @@ colnames(Data) <- "metric"
 if(!is.factor(Data$metric)){
   
   pAll <- ggplot(data = Data[!is.na(metric)], aes(metric)) + #ggtitle(label = "All data") +
-  geom_density(color = "firebrick", aes(y= after_stat(ndensity))) + 
+  geom_density(color = "firebrick", aes(y = after_stat(ndensity))) + 
   theme_classic() + ylab("") + xlab("") + scale_y_continuous(breaks = c(0, 0.5, 1), limits = c(0,1)) + 
   theme(panel.background = element_rect(fill = "lightgrey"), plot.margin = unit(c(0.5, 0.5, -0.5, 0.5),"lines"))
 

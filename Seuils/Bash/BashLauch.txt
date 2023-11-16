@@ -1,0 +1,20 @@
+#ORDRE BASH
+
+cd /usr/local/data/Amobio/AMOHYMOBIO/
+ls -lai
+chmod 777 -R *
+find . -type f \( -iname "*.R" \) -exec dos2unix {} +
+
+  nohup ./RFthresholds_Bash1.R &
+  nohup ./RFthresholds_Bash2.R &
+  nohup ./RFthresholds_Bash3.R &
+  nohup ./RFthresholds_Bash4.R &
+  nohup ./RFthresholds_Bash5.R &
+  nohup ./RFthresholds_Bash6.R &
+  nohup ./RFthresholds_Bash7.R &
+  nohup ./RFthresholds_Bash8.R &
+  nohup ./RFthresholds_Bash9.R &
+  nohup ./RFthresholds_Bash10.R 
+  
+ctrl Z => stop stuff
+bg
