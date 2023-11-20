@@ -8,7 +8,6 @@ directory <- paste0(getwd(), "/FinalMAJ_Naiades.Alric.Traits/")
 compartment <- "Macroinvertebrate"
 slice <- 1
 
-
 N_slices <- 5
 
 invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
@@ -29,6 +28,31 @@ Index_Fun <- left_join(Index_Fun,
 
 save(Index_Fun, file = paste("Dfun", compartment, slice, sep = "_"))
 
+
+TSI <- do.call(rbind,lapply(1:5, function(slice){
+  invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
+  
+  AllInv_slice <- Split_Inv(Inventory = get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),],
+                            Slice = slice, N_Slices = N_slices)
+  
+  return(Inventory_Functional_TSI(
+    Code = get(paste0("Code_",compartment))[Modalite %in% colnames(get(paste0("Traits_",compartment)))],
+    Inventory = AllInv_slice, 
+    Traits = get(paste0("Traits_",compartment))))
+}))
+
+NicheOverlap <- do.call(rbind,lapply(1:5, function(slice){
+  invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
+  
+  AllInv_slice <- Split_Inv(Inventory = get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),],
+                            Slice = slice, N_Slices = N_slices)
+  
+  return(Inventory_Functional_NicheOverlap(
+    Code = get(paste0("Code_",compartment))[Modalite %in% colnames(get(paste0("Traits_",compartment)))],
+    Inventory = AllInv_slice, 
+    Traits = get(paste0("Traits_",compartment))))
+}))
+
 #Save functional
 #####
 lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
@@ -36,6 +60,11 @@ lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
   do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun",
   compartment, 1:N_slices, sep = "_"), function(file){load(file); return(Index_Fun)})
 ))
+  assign(paste0("DiversityFunctional_", compartment),
+         merge(merge(
+           get(paste0("DiversityFunctional_", compartment)), TSI, by = c("CdStation", "Year")),
+           NicheOverlap, by = c("CdStation", "Year")))
+  
   save(list = paste0("DiversityFunctional_", compartment), 
   file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_", compartment))
 

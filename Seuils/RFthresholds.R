@@ -6,21 +6,21 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
 Nslice <- 1
 
+load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
+Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
+rm("MATRIX_AMOBIO_WP3_CLEAN")
+
 Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
 Params <- grep(paste(Params, collapse = "|"), colnames(Carhyce_all), value = "T")
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
 
-
 for(param in Params){
   
   print(param)
   
-load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
-Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
 Carhyce_all <- Carhyce_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(Carhyce_all), value = T), with = F]
 
-rm("MATRIX_AMOBIO_WP3_CLEAN")
 
 Thresholds <- seq(from = range(Carhyce_all[,..param], na.rm = T)[1], to = range(Carhyce_all[,..param], na.rm = T)[2], length.out = 10)
 
@@ -36,7 +36,7 @@ Thresh_draw <- lapply(Thresholds, function(Thresh){
 Rfd <- Carhyce_all[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
   , State := as.factor(State)]
 
-Thresh_AUC <- lapply(c("FISH", "INV", "DIA"), function(comp){
+Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
   
   Rfd_comp <- Rfd[, grep(paste0(comp,"|State|",param), colnames(Rfd), value = T), with = F]
   Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]

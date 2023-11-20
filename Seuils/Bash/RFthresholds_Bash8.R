@@ -5,6 +5,7 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest",
 
 load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
 RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
+colnames(RFD_all) <- gsub(" ", "", colnames(RFD_all))
 rm("MATRIX_AMOBIO_WP3_CLEAN")
 
 Nslice <- 8
@@ -25,7 +26,7 @@ for(param in Params){
     Rfd <- RFD[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
       , State := as.factor(State)]
     
-    Thresh_AUC <- lapply(c("FISH", "INV", "DIA"), function(comp){
+    Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
       
       Rfd_comp <- Rfd[, grep(paste0(comp,"|State|",param), colnames(Rfd), value = T), with = F]
       Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]

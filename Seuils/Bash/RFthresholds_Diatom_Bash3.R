@@ -8,13 +8,12 @@ RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
 colnames(RFD_all) <- gsub(" ", "", colnames(RFD_all))
 rm("MATRIX_AMOBIO_WP3_CLEAN")
 
-Nslice <- 7
+Nslice <- 3
 
 Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
 Params <- grep(paste(Params, collapse = "|"), colnames(RFD_all), value = "T")
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
-
 
 for(param in Params){
   
@@ -26,10 +25,10 @@ for(param in Params){
     Rfd <- RFD[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
       , State := as.factor(State)]
     
-    Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
-      
-      Rfd_comp <- Rfd[, grep(paste0(comp,"|State|",param), colnames(Rfd), value = T), with = F]
-      Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]
+    comp <- "B_DIA"
+
+    Rfd_comp <- Rfd[, grep(paste0(comp,"|State|",param), colnames(Rfd), value = T), with = F]
+    Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]
       
       if(!any(c(nrow(Rfd_comp[State == "good"]), nrow(Rfd_comp[State == "bad"])) < 100) & uniqueN(Rfd_comp$State) > 1){
         
@@ -61,20 +60,18 @@ for(param in Params){
             
           }) 
           
-          return(data.frame(AUC_val = mean(do.call(c,AUC_10Cross), na.rm = T),
+          Thresh_AUC_Dia <- data.frame(AUC_val = mean(do.call(c,AUC_10Cross), na.rm = T),
                             Low = quantile(do.call(c,AUC_10Cross), probs = 0.05, na.rm = T),
                             Up = quantile(do.call(c,AUC_10Cross), probs = 0.95, na.rm = T),
                             Threshold = Thresh,
-                            Compartment = comp))
+                            Compartment = comp)
           
-        } else {return(NA)}
+      } else {Thresh_AUC_Dia <- data.frame(AUC_val = NA, Low = NA, Up = NA, Threshold = Thresh, Compartment = comp)}
       
-    })
-    
-    return(do.call(rbind, Thresh_AUC)) 
+  return(Thresh_AUC_Dia)
     
   })
   
-  save(Thresh_draw, file = paste0("AUC_threshold_", param))
+  save(Thresh_draw, file = paste0("AUC_threshold_Diatom", param))
 }
 

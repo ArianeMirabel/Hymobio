@@ -9,8 +9,6 @@ Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 files <- list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils/Genomig_Output")
 files <- files[which(gsub("AUC_threshold_", "", files) %in% Catalog$NameOrigin)]
 
-legend <- NULL
-
 Threshold_plot <- lapply(files, function(param){
   
   load(paste0(getwd(),"/Genomig_Output/",param))
@@ -26,11 +24,13 @@ Threshold_plot <- lapply(files, function(param){
     x$Compartment = c("FISH", "INV", "DIA"); return(x)})))[
     , Compartment := factor(Compartment, levels = c("FISH", "INV", "DIA"))][, N := .N, by = Compartment]
   
-  Thresh_max <- unique(Thresh_plot[, AUCmax := Threshold[which.max(AUC_val)], by = Compartment][,.(Compartment, AUCmax)])
+  Thresh_max <- unique(Thresh_plot[, c("AUCmax","THRmax") := list(max(AUC_val, na.rm = T),Threshold[which.max(AUC_val)]), by = Compartment][
+    ,.(Compartment, AUCmax, THRmax)])
+  Thresh_max[Thresh_max==-Inf] <- NA
   
   plot <- ggplot(data = Thresh_plot, aes(x = Threshold, y = AUC_val, color = Compartment, fill = Compartment)) + 
-    geom_hline(yintercept = 0.7, color = "darkgrey", lty = 2) + 
-    geom_vline(data = Thresh_max, aes(xintercept = AUCmax, color = Compartment), lty = 2, show.legend = F) +
+    geom_hline(yintercept = 0.7, color = "darkgrey", lty = 1) + 
+    geom_segment(data = Thresh_max, aes(x = THRmax, xend = THRmax, y = 0, yend = AUCmax), lty = 2) +
     ggtitle(gsub("^[^_]*_|_.*", "", gsub("AUC_threshold_", "", param))) + 
     theme_classic() + facet_grid(. ~ Compartment) + 
     labs(x = paste0("Threshold (",Catalog[NameOrigin == gsub("AUC_threshold_", "", param), Unit],") "),
@@ -49,6 +49,11 @@ Threshold_plot <- lapply(files, function(param){
   plot <- plot + geom_point(data = Thresh_plot[N == 1]) + geom_errorbar(aes(ymax = Up, ymin = Low), width = 0.2) + 
     scale_x_continuous(breaks = unique(Thresh_plot$Threshold),
       labels = round(unique(Thresh_plot$Threshold), 1), limits = round(c(unique(Thresh_plot$Threshold)-1, unique(Thresh_plot$Threshold)+1)))
+  }
+  
+  if(!is.na(Catalog[NameOrigin == gsub("AUC_threshold_", "", param), LittThreshold])){
+    plot <- plot + 
+      geom_vline(aes(xintercept = Catalog[NameOrigin == gsub("AUC_threshold_", "", param), LittThreshold]), color = "royalblue", lty = 2)
   }
       
   } else {

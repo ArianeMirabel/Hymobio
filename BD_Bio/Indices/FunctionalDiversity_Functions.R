@@ -1,4 +1,4 @@
-invisible(lapply(c("data.table", "ggplot2", "entropart", "cluster", "dplyr", "StatMatch"),function(pk){
+invisible(lapply(c("data.table", "ggplot2", "entropart", "cluster", "dplyr", "StatMatch", "vegan"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
@@ -22,7 +22,7 @@ if(Compartment == "Fish"){
     setnames(ret, names(ret[,!"CdAppelTaxon"]), paste0(col, "_", names(ret[,!"CdAppelTaxon"])))
     return(ret)})
   Traits_Fish_modif <- Reduce(function(...) merge(..., by = "CdAppelTaxon"), Traits_Fish_modif)
-  Traits_Fish <- merge(Traits_Fish[,.SD,.SDcols = c("CdAppelTaxon", grep("food.DET|food.PLANT|food.ANI", names(Traits_Fish), value = T))], 
+  Traits_Fish <- merge(Traits_Fish[,c("CdAppelTaxon", grep("food.DET|food.PLANT|food.ANI", names(Traits_Fish), value = T)), with = F], 
                        Traits_Fish_modif, by = "CdAppelTaxon")
   assign("Traits_Fish", Traits_Fish, envir = .GlobalEnv)
   
@@ -46,6 +46,34 @@ Split_Inv <- function(Inventory, Slice, N_Slices){
                                                            ceiling(uniqueN(Inventory$CdStation)/N_slices)))
    return(Inventory[CdStation %in% SplitList[[Slice]]])}
 
+Inventory_Functional_TSI <- function(Code, Inventory, Traits) {
+  
+  TSI_tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_Food", Modalite]), with = F]
+  TSI_tree <- TSI_tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(TSI_tree), "CdAppelTaxon"), by = CdAppelTaxon]
+  
+  TSI_tree <- unique(TSI_tree[, Fsize := (sum(.SD^2) - (1/nrow(Code[Category == "Food_Size"])))/(1-(1/nrow(Code[Category == "Food_Size"])))
+  , .SDcols = Code[Category == "Food_Size", Modalite], by = CdAppelTaxon][,.(CdAppelTaxon, Fsize)])
+  
+  Inventory <- merge(Inventory, TSI_tree, by.x = "CdAppelTaxon_Join", by.y = "CdAppelTaxon", all.x = T)
+  
+  Inventory[, TSI := sum(Fsize * log(Abundance +1)) / sum(log(Abundance + 1)) , by = c("CdStation","Year")]
+  
+  return(unique(Inventory[ ,.(CdStation,Year, TSI)]))
+}
+
+
+Inventory_Functional_NicheOverlap <- function(Code, Inventory, Traits) {
+  
+  NO_tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_Food", Modalite]), with = F]
+  NO_tree <- NO_tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(NO_tree), "CdAppelTaxon"), by = CdAppelTaxon]
+  NO_tree <- as.matrix(as.matrix(designdist(NO_tree[, Code[Category == "Food_Size", Modalite], with = F], 
+                       method = "J/sqrt(A*B)", terms = "quadratic")))
+  rownames(NO_tree) <- unique(Traits[,CdAppelTaxon]); colnames(NO_tree) <- unique(Traits[,CdAppelTaxon])
+  
+  return(unique(Inventory[, 
+                      meanNO := mean(NO_tree[rownames(NO_tree) %in% CdAppelTaxon_Join, colnames(NO_tree) %in% CdAppelTaxon_Join])
+                      , by = c("CdStation","Year")][ ,.(CdStation, Year, meanNO)]))
+}
 
 Indexes_measure_fun <- function(Abce, Names, Dissim, Hill){
   
@@ -55,7 +83,6 @@ Indexes_measure_fun <- function(Abce, Names, Dissim, Hill){
            round(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
                           Dissim, Correction = "None"),2))
     })},
-                  
                   error = function(e) {print(e)})
   return(ret)
 }
