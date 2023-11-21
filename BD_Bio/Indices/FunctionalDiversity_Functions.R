@@ -48,23 +48,31 @@ Split_Inv <- function(Inventory, Slice, N_Slices){
 
 Inventory_Functional_TSI <- function(Code, Inventory, Traits) {
   
-  TSI_tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_Food", Modalite]), with = F]
-  TSI_tree <- TSI_tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(TSI_tree), "CdAppelTaxon"), by = CdAppelTaxon]
+  TSI_Tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_forNiche", Modalite]), with = F]
+  TSI_Tree <- TSI_Tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(TSI_Tree), "CdAppelTaxon"), by = CdAppelTaxon]
   
-  TSI_tree <- unique(TSI_tree[, Fsize := (sum(.SD^2) - (1/nrow(Code[Category == "Food_Size"])))/(1-(1/nrow(Code[Category == "Food_Size"])))
-  , .SDcols = Code[Category == "Food_Size", Modalite], by = CdAppelTaxon][,.(CdAppelTaxon, Fsize)])
+  Cat <- unique(Code[Type == "Ecology_forNiche", Category])
+  
+  for(cat in Cat){
+    trait <- Code[Category == cat, Modalite]
+    TSI_tree <- unique(TSI_Tree[, 
+              paste0("TSI", tolower(cat)) := (sum(.SD^2) - (1/length(trait)))/(1-(1/length(trait)))
+              , .SDcols = trait, by = CdAppelTaxon][,c("CdAppelTaxon", paste0("TSI", tolower(cat))), with = F])
   
   Inventory <- merge(Inventory, TSI_tree, by.x = "CdAppelTaxon_Join", by.y = "CdAppelTaxon", all.x = T)
   
-  Inventory[, TSI := sum(Fsize * log(Abundance +1)) / sum(log(Abundance + 1)) , by = c("CdStation","Year")]
+  Inventory[, paste0("TSI", tolower(cat)) := sum(get(paste0("TSI", tolower(cat))) * log(Abundance +1)) / sum(log(Abundance + 1)) 
+            , by = c("CdStation","Year")]
+  }
   
-  return(unique(Inventory[ ,.(CdStation,Year, TSI)]))
+  
+  return(unique(Inventory[ , c("CdStation", "Year", grep("TSI", colnames(Inventory), value = T)), with = F]))
 }
 
 
 Inventory_Functional_NicheOverlap <- function(Code, Inventory, Traits) {
   
-  NO_tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_Food", Modalite]), with = F]
+  NO_tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_forNiche", Modalite]), with = F]
   NO_tree <- NO_tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(NO_tree), "CdAppelTaxon"), by = CdAppelTaxon]
   NO_tree <- as.matrix(as.matrix(designdist(NO_tree[, Code[Category == "Food_Size", Modalite], with = F], 
                        method = "J/sqrt(A*B)", terms = "quadratic")))

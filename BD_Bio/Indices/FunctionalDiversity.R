@@ -5,7 +5,7 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio")
 load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
 directory <- paste0(getwd(), "/FinalMAJ_Naiades.Alric.Traits/")
-compartment <- "Macroinvertebrate"
+compartment <- "Diatom"
 slice <- 1
 
 N_slices <- 5
