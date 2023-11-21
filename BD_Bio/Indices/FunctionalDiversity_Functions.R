@@ -48,10 +48,10 @@ Split_Inv <- function(Inventory, Slice, N_Slices){
 
 Inventory_Functional_TSI <- function(Code, Inventory, Traits) {
   
-  TSI_Tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_forNiche", Modalite]), with = F]
+  TSI_Tree <- unique(Traits)[, c("CdAppelTaxon", Code[, Modalite]), with = F]#[, c("CdAppelTaxon", Code[Type == "Ecology_forNiche", Modalite]), with = F]
   TSI_Tree <- TSI_Tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(TSI_Tree), "CdAppelTaxon"), by = CdAppelTaxon]
   
-  Cat <- unique(Code[Type == "Ecology_forNiche", Category])
+  Cat <- unique(Code[, Category])#unique(Code[Type == "Ecology_forNiche", Category])
   
   for(cat in Cat){
     trait <- Code[Category == cat, Modalite]
@@ -72,15 +72,21 @@ Inventory_Functional_TSI <- function(Code, Inventory, Traits) {
 
 Inventory_Functional_NicheOverlap <- function(Code, Inventory, Traits) {
   
-  NO_tree <- unique(Traits)[, c("CdAppelTaxon", Code[Type == "Ecology_forNiche", Modalite]), with = F]
-  NO_tree <- NO_tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(NO_tree), "CdAppelTaxon"), by = CdAppelTaxon]
-  NO_tree <- as.matrix(as.matrix(designdist(NO_tree[, Code[Category == "Food_Size", Modalite], with = F], 
-                       method = "J/sqrt(A*B)", terms = "quadratic")))
-  rownames(NO_tree) <- unique(Traits[,CdAppelTaxon]); colnames(NO_tree) <- unique(Traits[,CdAppelTaxon])
+  NO_Tree <- unique(Traits)[, c("CdAppelTaxon", Code[, Modalite]), with = F]#[, c("CdAppelTaxon", Code[Type == "Ecology_forNiche", Modalite]), with = F]
+  NO_Tree <- NO_Tree[, lapply(.SD, as.numeric), .SDcols = setdiff(names(NO_Tree), "CdAppelTaxon"), by = CdAppelTaxon]
   
-  return(unique(Inventory[, 
-                      meanNO := mean(NO_tree[rownames(NO_tree) %in% CdAppelTaxon_Join, colnames(NO_tree) %in% CdAppelTaxon_Join])
-                      , by = c("CdStation","Year")][ ,.(CdStation, Year, meanNO)]))
+  Cat <- unique(Code[, Category])#unique(Code[Type == "Ecology_forNiche", Category])
+  
+  for(cat in Cat){
+    trait <- Code[Category == cat, Modalite]
+  NO_tree <- as.matrix(as.matrix(designdist(NO_Tree[, ..trait], method = "J/sqrt(A*B)", terms = "quadratic")))
+  rownames(NO_tree) <- NO_Tree$CdAppelTaxon; colnames(NO_tree) <- NO_Tree$CdAppelTaxon
+  Inventory[, paste0("meanNO", tolower(cat)) := 
+              mean(NO_tree[rownames(NO_tree) %in% CdAppelTaxon_Join, colnames(NO_tree) %in% CdAppelTaxon_Join], na.rm = T)
+            , by = c("CdStation","Year")]
+     }
+  
+  return(unique(Inventory[ , c("CdStation", "Year", grep("meanNO", colnames(Inventory), value = T)), with = F]))
 }
 
 Indexes_measure_fun <- function(Abce, Names, Dissim, Hill){
