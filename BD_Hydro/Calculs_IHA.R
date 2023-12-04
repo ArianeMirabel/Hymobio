@@ -4,7 +4,7 @@ invisible(lapply(c("devtools"),function(pk){
   library(pk,character.only=T)}))
 remotes::install_github("doi-usgs/EflowStats@v5.1.1")
 #####
-invisible(lapply(c("EflowStats", "data.table", "lmomco", "dplyr", "lubridate", "ggpubr", "ggplot2"),function(pk){
+invisible(lapply(c("EflowStats", "data.table", "lmomco", "dplyr", "lubridate", "ggpubr", "ggplot2", "hydroTSM"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
@@ -44,6 +44,28 @@ Amplitude <- function(x){
   if(a == 0 & b == 0) { Pha <- NA }
   
   return(data.table(period = unique(x$period),Amplitude = Ampli, Phase = Pha))
+}
+
+# Count the number of low water and floods events based on the QMNA qnd equivalent high water levels
+CountPeriods <- function(Q, module, dates, type, threshold = 7){
+  
+  if(is.na(unique(module))){ return(NA) }
+  
+  ifelse(type == "etiage", 
+                ret <- data.table(dates = dates[which(Q <= module)]), 
+                ret <- data.table(dates = dates[which(Q  >= module)]))
+  
+  ret <- ret[order(dates)][, Run_period := 1][
+    , Date_check := seq.Date(from = first(dates), length.out = length(dates), by = "days")-dates]
+  
+  while(any(ret[, Date_check] < -threshold )){ret[Date_check != 0 & Date_check > -threshold, dates := 
+        seq.Date(from = first(dates), length.out = length(dates), by = "days")][Date_check != 0 & Date_check > -threshold, 
+        Date_check := seq.Date(from = first(dates), length.out = length(dates), by = "days")-dates][
+          Date_check < -threshold,  c("Run_period", "Date_check") := list(Run_period + 1, 
+          seq.Date(from = first(dates), length.out = length(dates), by = "days")-dates)]
+  }
+  
+  return(uniqueN(ret[,Run_period]))
 }
 
 # Measure IHA for the sampling dates, for the given time steps
@@ -90,12 +112,31 @@ Hydro_serie <- merge(Hydro_serie, Ampli, by = "period")
 
 if(Tstep == 0){
   Tstep <- "all"
-  Hydro_serie[, crue := resultat_obs_elab >= quantile(Hydro_serie$resultat_obs_elab, 0.9)*3][, Ncrue := length(which(crue))][
-    , crue := NULL]
+  
+  QM <- cbind(
+    unique(Hydro_serie[, AnnualMax := max(resultat_obs_elab, na.rm = T), by = year][, Indexyear := (as.numeric(year) - min(as.numeric(year))) +1][
+      ,.(AnnualMax, year, Indexyear)][, rank := dense_rank(AnnualMax)])[, Prob := (.N - rank +1)/(.N +1)][, ReturnPeriod := 1/Prob][
+        order(ReturnPeriod)][, paste0("QMMax", c(2, 5, 10)) := lapply(c(2, 5, 10), function(D){AnnualMax[which(ReturnPeriod > D)[1]]})],
+    
+    unique(Hydro_serie[, AnnualMin := min(resultat_obs_elab, na.rm = T), by = year][, Indexyear := (as.numeric(year) - min(as.numeric(year))) + 1][
+      ,.(AnnualMin, year, Indexyear)][, rank := dense_rank(-AnnualMin)])[, Prob := (.N - rank +1)/(.N +1)][, ReturnPeriod := 1/Prob][
+        order(ReturnPeriod)][, paste0("QMNA", c(2, 5, 10)) := lapply(c(2, 5, 10), function(D){AnnualMin[which(ReturnPeriod > D)[1]]})]
+  )
+  
+  Hydro_serie[, grep("QM", colnames(QM), value = T) := unique(QM[, grep("QM", colnames(QM), value = T), with = F])]
+  
+  Hydro_serie[, paste0("Netiage", c(2, 5, 10)) := lapply(.SD, function(Module) {return(
+    CountPeriods(Q = resultat_obs_elab, module = Module, dates = Date, type = "etiage"))}), 
+    .SDcols = grep("QMNA", colnames(Hydro_serie), value = T)]
+  
+  Hydro_serie[, paste0("Ncrues", c(2, 5, 10)) := lapply(.SD, function(Module) {return(
+    CountPeriods(Q = resultat_obs_elab, module = Module, dates = Date, type = "crue"))}), 
+    .SDcols = grep("QMMax", colnames(Hydro_serie), value = T)]
+  
 }
 
-Hydro_serie <- unique(Hydro_serie[,intersect(colnames(Hydro_serie), 
-               c("Samp_date", "period","Lmean","Lscale","Lskew", "Lkurt","corrAR1" ,"Amplitude","Phase","Ncrue")), with = F])
+Hydro_serie <- unique(Hydro_serie[,intersect(colnames(Hydro_serie), c("Samp_date", "period","Lmean","Lscale","Lskew", "Lkurt",
+                      "corrAR1" ,"Amplitude","Phase",grep("QM|Netiage|Ncrues", colnames(Hydro_serie), value = T))), with = F])
 
 setnames(Hydro_serie, setdiff(colnames(Hydro_serie), c("Samp_date")),
          paste0("H_",setdiff(colnames(Hydro_serie), c("Samp_date")), "_", Tstep))
@@ -104,7 +145,9 @@ return(Hydro_serie)
 
 }
 
-#rm(list=setdiff(ls(), c("Correspondance_station", "Hydro_journaliere", "stationBio")))
+
+
+#rm(list=setdiff(ls(), c("Correspondance_station", "Hydro_journaliere")))
 
 tol_threshold <- 0.75
 laps <- c(3,6,12,50,0)
@@ -160,9 +203,6 @@ setTxtProgressBar(pb, which(unique(Correspondance_station[, ID_AMOBIO_START])) =
 
 })
 
-testNA <- unlist(lapply(Hydrolaps, function(si){anyNA(si[,ID_AMOBIO_START])}))
-print("check for nas")
-
 Hydrolaps <- lapply(Hydrolaps, function(si){
   if(!is.data.table(si[[1]])){return(si[[2]])
   } else {
@@ -173,25 +213,41 @@ Hydrolaps <- Hydrolaps[which(unlist(lapply(Hydrolaps, is.data.table)))]
 Hydrolaps <- rbindlist(Hydrolaps, fill = T)
 Hydrolaps <- Hydrolaps[,c("ID_AMOBIO_START", "Samp_date", grep("H_", colnames(Hydrolaps), value = T)), with = F]
 
-save(Hydrolaps, file = "HydroIndex_36125all_AM_20230821")
+save(Hydrolaps, file = "HydroIndex_36125all_AM_20232911")
+
+
+
+
 #####
 
 ## Plot validité données
 #####
-load("HydroIndex_36125all_AM_20230821")
+load("HydroIndex_36125all_AM_20232911")
 laps <- c("3","6","12","60")
+module <- c("2", "5", "10")
+
 Plot_valid <- Hydrolaps[, Compartment := sub("_.*", "", ID_AMOBIO_START)][, Year := format(as.Date(Samp_date, format =  "%Y-%m-%d"), "%Y")][,
             paste0("Nstation_",laps) := lapply(laps, function(i){uniqueN(ID_AMOBIO_START)}), by = "Year"]
-Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){median(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"][
-  , Mean_Ncrue := mean(H_Ncrue_all), by = "Year"]
+Plot_valid[, paste0("MeanLap_",laps) := lapply(laps, function(i){median(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"]
 Plot_valid[, paste0("SdLap_",laps) := lapply(laps, function(i){sd(get(paste0("H_Lmean_",i)), na.rm = T)}), by = "Year"]
 Plot_valid[, paste0("UpLap_",laps) := lapply(laps, function(i){quantile(get(paste0("H_Lmean_",i)), probs = 0.6, na.rm = T)}), by = "Year"]
 Plot_valid[, paste0("LowLap_",laps) := lapply(laps, function(i){quantile(get(paste0("H_Lmean_",i)), probs = 0.4, na.rm = T)}), by = "Year"]
 
-Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|SdLap|UpLap|LowLap|Nstation", names(Plot_valid), value = T)),
+Plot_valid[, paste0("MeanEtiages_",module) := lapply(module, function(i){median(get(paste0("H_Netiage",i, "_all")), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("SdEtiages_",module) := lapply(module, function(i){sd(get(paste0("H_Netiage",i, "_all")), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("UpEtiages_",module) := lapply(module, function(i){quantile(get(paste0("H_Netiage",i, "_all")), probs = 0.6, na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("LowEtiages_",module) := lapply(module, function(i){quantile(get(paste0("H_Netiage",i, "_all")), probs = 0.4, na.rm = T)}), by = "Year"]
+
+Plot_valid[, paste0("MeanCrues_",module) := lapply(module, function(i){median(get(paste0("H_Ncrues",i, "_all")), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("SdCrues_",module) := lapply(module, function(i){sd(get(paste0("H_Ncrues",i, "_all")), na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("UpCrues_",module) := lapply(module, function(i){quantile(get(paste0("H_Ncrues",i, "_all")), probs = 0.6, na.rm = T)}), by = "Year"]
+Plot_valid[, paste0("LowCrues_",module) := lapply(module, function(i){quantile(get(paste0("H_Ncrues",i, "_all")), probs = 0.4, na.rm = T)}), by = "Year"]
+
+
+Plot_valid <- unique(Plot_valid[,c("Compartment","Year", grep("MeanLap|SdLap|UpLap|LowLap|Nstation|Crues|Etiages", names(Plot_valid), value = T)),
                                 with = F])[!is.na(Year)]
 
-long <- merge(
+Qlong <- merge(
   merge(
   merge(melt(Plot_valid[,c("Compartment", "Year", grep("MeanLap", names(Plot_valid), value = T)), with = F], 
              id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Mean")[, Lap := sub(".*_", "", Lap)],
@@ -204,24 +260,55 @@ long <- merge(
   melt(Plot_valid[,c("Compartment", "Year", grep("Nstation", names(Plot_valid), value = T)), with = F], 
        id.vars = c("Compartment", "Year"), variable.name = "Lap", value.name = "Nstation")[, Lap := sub(".*_", "", Lap)], 
         by = c("Compartment", "Year", "Lap"))[!is.na(Mean)]
-long[, Lap := factor(Lap, levels = c("3","6","12","60","all"))]
+Qlong[, Lap := factor(Lap, levels = c("3","6","12","60","all"))]
 
+Extlong <-   merge(
+  merge(melt(Plot_valid[,c("Compartment", "Year", grep("MeanCrues", names(Plot_valid), value = T)), with = F], 
+             id.vars = c("Compartment", "Year"), variable.name = "Module", value.name = "Mean")[, Module := sub(".*_", "", Module)],
+        melt(Plot_valid[,c("Compartment", "Year", grep("UpCrues", names(Plot_valid), value = T)), with = F], 
+             id.vars = c("Compartment", "Year"), variable.name = "Module", value.name = "Upper")[, Module := sub(".*_", "", Module)], 
+        by = c("Compartment", "Year", "Module")),
+  melt(Plot_valid[,c("Compartment", "Year", grep("LowCrues", names(Plot_valid), value = T)), with = F], 
+       id.vars = c("Compartment", "Year"), variable.name = "Module", value.name = "Lower")[, Module := sub(".*_", "", Module)], 
+  by = c("Compartment", "Year", "Module"))[, Type := "Crues"]
+
+Extlong <- rbind(Extlong,
+                   merge(
+  merge(melt(Plot_valid[,c("Compartment", "Year", grep("MeanEtiages", names(Plot_valid), value = T)), with = F], 
+             id.vars = c("Compartment", "Year"), variable.name = "Module", value.name = "Mean")[, Module := sub(".*_", "", Module)],
+        melt(Plot_valid[,c("Compartment", "Year", grep("UpEtiages", names(Plot_valid), value = T)), with = F], 
+             id.vars = c("Compartment", "Year"), variable.name = "Module", value.name = "Upper")[, Module := sub(".*_", "", Module)], 
+        by = c("Compartment", "Year", "Module")),
+  melt(Plot_valid[,c("Compartment", "Year", grep("LowEtiages", names(Plot_valid), value = T)), with = F], 
+       id.vars = c("Compartment", "Year"), variable.name = "Module", value.name = "Lower")[, Module := sub(".*_", "", Module)], 
+  by = c("Compartment", "Year", "Module"))[, Type := "Etiages"])
+Extlong[, Module := factor(Module, levels = c("2","5","10"))]
+
+
+pN <- ggplot(Qlong, aes(x = Year, y = Nstation, group = Lap, color = Lap), show.legend = F) +
+  geom_line(show.legend =  F) + theme_minimal() + ylab("N\nStations") +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
+  scale_y_continuous(breaks = seq(0, 600, by = 200)) + ggtitle("(a)") +
+  scale_color_manual(name = "Lap", labels = labs, values =  vals)
 
 labs <- c("3 months" , "6 months", "1 year","5 years");
 vals <- c("firebrick" , "darkorange", "olivedrab3","royalblue")
-pMean <- ggplot(long) + 
+pMean <- ggplot(Qlong) + 
   geom_line(aes(x = Year, y = Mean, group = Lap, color = Lap)) + 
   geom_ribbon(alpha = 0.2, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Lap, fill = Lap)) + 
   theme_minimal() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
   labs(y = "Mean (l/s)") + scale_fill_manual(name = "Lap", labels = labs, values =  vals) +   
   scale_color_manual(name = "Lap", labels = labs, values =  vals) + ggtitle("(b)")
 
-
-pN <- ggplot(long, aes(x = Year, y = Nstation, group = Lap, color = Lap), show.legend = F) +
-  geom_line(show.legend =  F) + theme_minimal() + ylab("N\nStations") +
-  theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
-  scale_y_continuous(breaks = seq(0, 600, by = 200)) + ggtitle("(a)") +
-  scale_color_manual(name = "Lap", labels = labs, values =  vals)
+labs <- c("Limite 10 ans (décennale)" , "Limite 5 ans", "Limite 2 ans");
+vals <- c( "lightskyblue", "cornflowerblue" ,"royalblue4")
+pExtrem <- ggplot(Extlong) + 
+  geom_line(aes(x = Year, y = Mean, group = Module, color = Module)) + 
+  geom_ribbon(alpha = 0.2, aes(x = Year, y = Mean, ymin = Lower, ymax = Upper, group = Module, fill = Module)) + 
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+  labs(y = "Occurence") + scale_fill_manual(name = "Module", labels = labs, values =  vals) +   
+  scale_color_manual(name = "Module", labels = labs, values =  vals) + ggtitle("(c)") + facet_wrap(~Type)
+pExtrem 
 
 
 ggarrange(pN, pMean, ncol = 1, common.legend = T, heights = c(1,3), 

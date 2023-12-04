@@ -4,11 +4,19 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest",
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
+load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20231123.Rdata")
+Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[, H_Ncrue_S1_ALL := NULL]
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro/HydroIndex_36125all_AM_20232911")
+Carhyce_all <- left_join(Carhyce_all, 
+                         Hydrolaps[, c("ID_AMOBIO_START", "Samp_date", grep("Ncrues|Netiage", colnames(Hydrolaps), value = T)), with = F],
+                         by = c("ID" = "ID_AMOBIO_START", "DATE_OPERATION" = "Samp_date"))
+save(Carhyce_all, file = "HYMOBIO_FULLDATA_20231129")
+rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"))
+
+
 Nslice <- 1
 
-load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
-Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
-rm("MATRIX_AMOBIO_WP3_CLEAN")
+load("HYMOBIO_FULLDATA_20231129")
 
 Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
