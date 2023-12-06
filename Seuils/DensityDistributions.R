@@ -23,12 +23,9 @@ write.table(Finale, file = "FinalMetrics.csv", sep=";", row.names = F)
 
 # Plot variables density distribution
 #####
-Catalog <- fread("MetricsCatalogue.csv")
-Catalog <- Catalog[which(Tokeep)]
+Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 
-load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
-Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN); rm("MATRIX_AMOBIO_WP3_CLEAN")
-Carhyce_all <- Carhyce_all[, Catalog$NameOrigin, with = F]
+load("HYMOBIO_FULLDATA_20231129.RData")
 
 Outliers <- 5
 
@@ -40,7 +37,7 @@ lapply(1:nrow(Categories), function(i){
   
   CatPlot <- lapply(Catalog[Category == Categories[i,"Abbrev"], NameOrigin], function(Metric){
     
-  Data <- Carhyce_all[, Metric, with = F]
+  Data <- RFD_all[, Metric, with = F]
 colnames(Data) <- "metric"
 
 if(!is.factor(Data$metric)){
@@ -96,16 +93,15 @@ lapply(1:length(SplitPlotCategory), function(j){
 
 # Set thresholds
 #####
-Catalog <- fread("MetricsCatalogue.csv")
-Catalog <- Catalog[which(Tokeep)]
+Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 
 load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 SelectedStations <- as.data.table(list_station_filter5_clean)[COMPARTIMENT_TARGET %in% c("DIATOM","FISH","MACROINVERTEBRATE")]
 rm(list_station_filter5_clean)
 
 load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
-Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
-Carhyce_selected <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[node_id %in% SelectedStations$node_id_START]; rm("MATRIX_AMOBIO_WP3_CLEAN")
+RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
+RFD_selected <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[node_id %in% SelectedStations$node_id_START]; rm("MATRIX_AMOBIO_WP3_CLEAN")
 
 Outliers <- 20
 KeepOutliers <- FALSE
@@ -119,8 +115,8 @@ lapply(1:nrow(Categories), function(i){
   
   CatPlot <- lapply(Catalog[Category == Categories[i,"Abbrev"], NameOrigin], function(Metric){
     
-    Data <- rbind(Carhyce_all[, Metric, with = F][, Source := "All"],
-                  Carhyce_selected[, Metric, with = F][, Source:= "Sel"])
+    Data <- rbind(RFD_all[, Metric, with = F][, Source := "All"],
+                  RFD_selected[, Metric, with = F][, Source:= "Sel"])
     setnames(Data, Metric,"metric")
     
     if(!is.factor(Data$metric)){

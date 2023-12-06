@@ -3,23 +3,22 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest",
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-load("AMOBIO_WP3_2_FISH_INV_DIA_20230817.Rdata")
-RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)
-colnames(RFD_all) <- gsub(" ", "", colnames(RFD_all))
-rm("MATRIX_AMOBIO_WP3_CLEAN")
-
 Nslice <- 3
 
-Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
-Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
-Params <- grep(paste(Params, collapse = "|"), colnames(RFD_all), value = "T")
-Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
+load("HYMOBIO_FULLDATA_20231129.RData")
 
+Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
+Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
 
 for(param in Params){
   
   RFD <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T), with = F]
   Thresholds <- seq(from = range(RFD[,..param], na.rm = T)[1], to = range(RFD[,..param], na.rm = T)[2], length.out = 10)
+  
+  if(!is.na(Catalog[NameOrigin == param,LittThreshold])){
+    Thresholds[which.min(abs(Thresholds-as.numeric(Catalog[NameOrigin == param,LittThreshold])))] <- Catalog[NameOrigin == param,LittThreshold]
+  }
   
   Thresh_draw <- lapply(Thresholds, function(Thresh){
     

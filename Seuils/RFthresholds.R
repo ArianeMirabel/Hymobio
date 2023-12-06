@@ -1,39 +1,41 @@
-invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel"),function(pk){
+invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel", "dplyr"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
+Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+
 load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20231123.Rdata")
-Carhyce_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[, H_Ncrue_S1_ALL := NULL]
+RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[, H_Ncrue_S1_ALL := NULL]
 load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro/HydroIndex_36125all_AM_20232911")
-Carhyce_all <- left_join(Carhyce_all, 
+RFD_all <- left_join(RFD_all, 
                          Hydrolaps[, c("ID_AMOBIO_START", "Samp_date", grep("Ncrues|Netiage", colnames(Hydrolaps), value = T)), with = F],
                          by = c("ID" = "ID_AMOBIO_START", "DATE_OPERATION" = "Samp_date"))
-save(Carhyce_all, file = "HYMOBIO_FULLDATA_20231129")
-rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"))
+colnames(RFD_all) <- sub(" ", "_", colnames(RFD_all))
+RFD_all <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T), with = F]
+RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
+save(RFD_all, file = "HYMOBIO_FULLDATA_20231129.RData")
+rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"));
 
 
 Nslice <- 1
 
-load("HYMOBIO_FULLDATA_20231129")
-
-Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
-Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
-Params <- grep(paste(Params, collapse = "|"), colnames(Carhyce_all), value = "T")
+load("HYMOBIO_FULLDATA_20231129.RData")
+#Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
+Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
 
 for(param in Params){
   
   print(param)
   
-Carhyce_all <- Carhyce_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(Carhyce_all), value = T), with = F]
-
-
-Thresholds <- seq(from = range(Carhyce_all[,..param], na.rm = T)[1], to = range(Carhyce_all[,..param], na.rm = T)[2], length.out = 10)
+    RFD_all <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T), with = F]
+    Thresholds <- seq(from = range(RFD_all[,..param], na.rm = T)[1], to = range(RFD_all[,..param], na.rm = T)[2], length.out = 10)
 
 if(!is.na(Catalog[NameOrigin == param,LittThreshold])){
-  Thresholds[which.min(abs(Thresholds-Catalog[NameOrigin == param,LittThreshold]))] <- Catalog[NameOrigin == param,LittThreshold]
+  #If there is a litterature thresshold, replace the closest "arbitrary" limit by the litterature threshold
+  Thresholds[which.min(abs(Thresholds-as.numeric(Catalog[NameOrigin == param,LittThreshold])))] <- Catalog[NameOrigin == param,LittThreshold]
 }
 
 Thresh_draw <- lapply(Thresholds, function(Thresh){
@@ -41,7 +43,7 @@ Thresh_draw <- lapply(Thresholds, function(Thresh){
          pb <- txtProgressBar(min = 0, max = 10, style = 3)
          setTxtProgressBar(pb, which(Thresholds == Thresh))
          
-Rfd <- Carhyce_all[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
+Rfd <- RFD_all[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
   , State := as.factor(State)]
 
 Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
