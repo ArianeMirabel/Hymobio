@@ -19,9 +19,11 @@ save(RFD_all, file = "HYMOBIO_FULLDATA_20231129.RData")
 rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"));
 
 
-Nslice <- 3
+Nslice <- 1
 
 load("HYMOBIO_FULLDATA_20231129.RData")
+Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+
 #Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
@@ -46,6 +48,11 @@ Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
   
   Rfd_comp <- RFD_all[, grep(paste0(comp,"|State|",param), colnames(RFD_all), value = T), with = F]
   Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]
+  
+  #ret <- Rfd_comp[, lapply(.SD, function(x) sum(is.na(x))/nrow(Rfd_comp)), .SDcols = grep(comp, colnames(Rfd_comp))]
+  
+  #ggplot(data.frame(Metric = names(ret), Value = unlist(ret)), aes(x = Metric, y = Value)) + geom_line() + theme(axis.text.x = element_blank())
+  
   Rfd_comp <- Rfd_comp[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
   , State := as.factor(State)]
   
@@ -112,47 +119,6 @@ ggplot(data = Thresh_plot[complete.cases(Thresh_plot),], aes(x = Threshold, y = 
               color = "white", fill = "olivedrab", alpha = 0.3)
   
   
-
-## Plot density distributions
-
-Titles <- fread("MetricsTitles.csv")
-
-Density_plots <- lapply(Params, function(param){
   
-Dens_plot <- RFD_all[, ..param]
-Dens_plot <-Dens_plot[complete.cases(Dens_plot)]
-
-Pdens <- ggplot(Dens_plot, aes(x = !!sym(param))) + geom_density()+
-  ggtitle(Titles[Name_Origine == param, Description]) + 
-        theme_classic() +
-        labs(x = paste0("(",Catalog[NameOrigin == param, Unit],") ")) + 
-        theme(plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"), legend.position = 'none', 
-              axis.text.x = element_text(angle = 90), axis.text=element_text(size=8),
-              axis.title=element_text(size=10), plot.title = element_text(size = 10))
-
-return(Pdens)
-})
-
-names(Density_plots) <- Params
-
-lapply(unique(Titles$Category), function(cat){
-  
-  Density_cat <- Density_plots[Titles[Category == cat, Name_Origine]]
-  
-  SplitPlotCategory <- split(1:length(Density_cat), ceiling(1:length(Density_cat)/6))
-  
-  lapply(1:length(SplitPlotCategory), function(j){
-    
-    Image <- ggarrange(plotlist = Density_cat[SplitPlotCategory[[j]]], ncol = 3, nrow = 2, 
-                       common.legend = T, legend = "right")
-    
-    png(paste0("Density_plot", cat, j,".png"), width = 800, height = 400,)
-    
-    print(annotate_figure(Image, top = text_grob(cat, size = 10)))
-    
-    dev.off()
-    
-  })
-})
 
 
