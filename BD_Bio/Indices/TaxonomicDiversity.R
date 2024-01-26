@@ -45,8 +45,10 @@ Indexes_measure <- function(X){
 Inventory_taxo <- function(Inv){
   setnames(Inv, names(Inv), gsub("NomLatin_Taxo|NomLatinAppelTaxon", "NomTaxo", names(Inv)))
   
-  Inv <- unique(Inv[,.(Group, CdStation, Year, NomTaxo, Abundance)][
-    , Abundance := ceiling(mean(Abundance)), by = c("CdStation", "NomTaxo", "Year")])
+  Inv <- unique(Inv[,.(Group, CdStation, Year, Date_PrelBio, NomTaxo, Abundance)][
+    , Abundance := sum(Abundance), by = c("CdStation", "NomTaxo", "Date_PrelBio")])
+  Inv <- unique(Inv[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "NomTaxo", "Year")][
+    , .(Group, CdStation, NomTaxo, Year, Abundance)])
   
   Inv <- unique(Inv[
     , c("Nspecies", Inds, "Bias_Estimator") := c(uniqueN(NomTaxo), Indexes_measure(Abundance)), 
@@ -67,7 +69,6 @@ Index_Taxo <- lapply(c("Fish", "Macroinvertebrate", "Diatom"), function(compartm
        file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/DiversityTaxonomic_", compartment))
   })
 
-
 Index_Taxo_Diatom <- Inventory_taxo(Inv = AllInv_Diatom)
 save(Index_Taxo_Diatom, file = "TaxonomicBiodiv_Diatom")
 
@@ -77,7 +78,43 @@ save(Index_Taxo_Macroinvertebrate, file = "TaxonomicBiodiv_Macroinvertebrate")
 Index_Taxo_Fish <- Inventory_taxo(AllInv_Fish)
 save(Index_Taxo_Fish, file = "TaxonomicBiodiv_Fish")
 
+##
+# Diatoms supplementary taxo
+dir <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/"
+load(paste0(dir,"Diatom_Inventories"))
+load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
+Inv <- unique(AllInv_Diatom[,.(Group, CdStation, Year, Date_PrelBio, NomLatin_Simple, Genus, Abundance)][
+  , Abundance := sum(Abundance), by = c("CdStation", "NomLatin_Simple", "Genus", "Date_PrelBio")])
+Inv <- unique(Inv[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "NomLatin_Simple", "Year")][
+  , .(Group, CdStation, NomLatin_Simple, Genus, Date_PrelBio, Year, Abundance)])
+
+Inv <- unique(Inv[, Ngenus := sum(Abundance), by = c("CdStation", "Year", "Genus")][
+    , Abdgenus := Ngenus/sum(Abundance), by = c("CdStation", "Year")][
+    , Rgenus := as.numeric(uniqueN(NomLatin_Simple)), by = c("CdStation", "Year", "Genus")][
+    , Rgenus := as.numeric(Rgenus/uniqueN(NomLatin_Simple)), by = c("CdStation", "Year")][
+    , .(Group, CdStation, Date_PrelBio, Year, Genus, Abdgenus, Rgenus)])
+
+Inv <- dcast(Inv, Group + CdStation + Date_PrelBio + Year ~ Genus, value.var = c("Abdgenus", "Rgenus"))
+Inv[is.na(Inv),] <-0
+
+setnames(Inv, grep("Abdgenus|Rgenus", colnames(Inv), value = T), 
+         paste0("B_DIA_", grep("Abdgenus|Rgenus", colnames(Inv), value = T)))
+Inv[, grep("Abnormal", colnames(Inv), value = T) := NULL]
+cols <- setdiff(colnames(Inv), c("Group", "CdStation", "Date_PrelBio", "Year"))
+Inv <- Inv[,  lapply(.SD, mean), .SDcols = cols, by = c("Group", "CdStation","Year")]
+
+SuppTaxo_Diatom <- merge(Inv, 
+             unique(as.data.table(list_station_filter5_clean)[COMPARTIMENT_START == toupper(unique(Inv$Group)), 
+                    .(ID_AMOBIO_START, ID_START)]), by.x = "CdStation", by.y = "ID_START", all.x = T)[
+                     ,c("Group", "CdStation", "ID_AMOBIO_START", "Year", grep("B_DIA", colnames(Inv), value = T)), with = F]
+
+save(SuppTaxo_Diatom, file = 
+       "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Diatom_SuppTaxo")
+
+
+##
+# Data plots
 Toplot <- rbind(Index_Taxo_Fish, Index_Taxo_Macroinvertebrate, Index_Taxo_Diatom)[ , as.list(unlist(lapply(.SD, 
       function(x) list(mean = mean(x, na.rm = T), 
                        up = mean(x, na.rm = T)+sd(x, na.rm = T)/2, 

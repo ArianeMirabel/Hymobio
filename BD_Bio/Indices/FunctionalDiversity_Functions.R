@@ -104,6 +104,11 @@ Indexes_measure_fun <- function(Abce, Names, Dissim, Hill){
 
 Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
   
+  Inventory <- unique(Inventory[,.(Group, CdStation, Year, Date_PrelBio, CdAppelTaxon_Join, Abundance)][
+    , Abundance := sum(Abundance), by = c("CdStation", "CdAppelTaxon_Join", "Date_PrelBio")])
+  Inventory <- unique(Inventory[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "CdAppelTaxon_Join", "Year")][
+    , .(CdStation, CdAppelTaxon_Join, Year, Abundance)])
+  
   Functional_tree <- unique(Traits)[, c("CdAppelTaxon", grep(paste(Code$Trait, collapse = "|"), colnames(Traits), value = T)),
                                     with = F]
   
@@ -182,7 +187,6 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
   return(Reduce(function(...) merge(..., by = c("CdStation", "Year")), 
                 list(Indices_Modalite, Indices_Trait, Indices_Total)))
 }
-
 
 
 

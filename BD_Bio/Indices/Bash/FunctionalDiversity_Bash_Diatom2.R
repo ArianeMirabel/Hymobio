@@ -25,4 +25,4 @@ Index_Fun <- left_join(Index_Fun,
                        .(ID_AMOBIO_START, ID_START)]), by = c("CdStation" = "ID_START"))[
             ,c("Group", "CdStation", "ID_AMOBIO_START", "Year", grep("R_|Sh_|Si_", colnames(Index_Fun), value = T)), with = F]
 
-save(Index_Fun, file = paste("Dfun", compartment, slice, sep = "_"))
+save(Index_Fun, file = paste("Dfun_2401_", compartment, slice, sep = "_"))

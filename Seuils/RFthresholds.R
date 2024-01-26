@@ -8,29 +8,47 @@ Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 
 load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20231123.Rdata")
 RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[, H_Ncrue_S1_ALL := NULL]
+
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Janv24_Diatom")
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Diatom_SuppTaxo")
+Index_Taxo_Diatom <- merge(Index_Taxo_Diatom, SuppTaxo_Diatom, by = c("Group", "CdStation", "ID_AMOBIO_START", "Year"))
+save(Index_Taxo_Diatom, file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Janv24_Diatom")
+
+
+grep("B_FISH", colnames(RFD_all), value = T)
+directory <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/"
+lapply(paste0(directory,grep("Janv24",list.files(directory), value =T)), load, .GlobalEnv)
+
+
 load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro/HydroIndex_36125all_AM_20232911")
 RFD_all <- left_join(RFD_all, 
                          Hydrolaps[, c("ID_AMOBIO_START", "Samp_date", grep("Ncrues|Netiage", colnames(Hydrolaps), value = T)), with = F],
                          by = c("ID" = "ID_AMOBIO_START", "DATE_OPERATION" = "Samp_date"))
 colnames(RFD_all) <- sub(" ", "_", colnames(RFD_all))
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/SuppTaxo_Diatom")
+RFD_all <- left_join(RFD_all, 
+                     SuppTaxo_Diatom[, c("ID_AMOBIO_START", "Date_PrelBio", grep("B_DIA", colnames(SuppTaxo_Diatom), value = T)), with = F],
+                     by = c("ID" = "ID_AMOBIO_START", "DATE_OPERATION" = "Date_PrelBio"))
 RFD_all <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T), with = F]
 RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
-save(RFD_all, file = "HYMOBIO_FULLDATA_20231129.RData")
+save(RFD_all, file = "HYMOBIO_FULLDATA_20240112.RData")
 rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"));
 
 
 Nslice <- 3
 
-load("HYMOBIO_FULLDATA_20231129.RData")
+load("HYMOBIO_FULLDATA_20240112.RData")
 #Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
+
+#Params <- setdiff(Params, gsub("AUC_threshold_", "",list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils/Genomig_Output")))
 
 for(param in Params){
   
   print(param)
   
-    RFD_all <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T), with = F]
+    RFD_all <- RFD_all[, grep(paste0("B_DIA",param), colnames(RFD_all), value = T), with = F]
     Thresholds <- seq(from = range(RFD_all[,..param], na.rm = T)[1], to = range(RFD_all[,..param], na.rm = T)[2], length.out = 10)
 
 if(!is.na(Catalog[NameOrigin == param,LittThreshold])){
@@ -94,7 +112,7 @@ return(do.call(rbind, Thresh_AUC))
 })
 
 
-save(Thresh_draw, file = paste0("AUC_threshold_", param))
+save(Thresh_draw, file = paste0("AUC_threshold_50sites", param))
 }
 
 
