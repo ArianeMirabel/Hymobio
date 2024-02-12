@@ -29,11 +29,11 @@ Inventory_taxo <- function(Inv){
   Inv <- unique(Inv[,.(Group, CdStation, Year, Date_PrelBio, NomTaxo, Abundance)][
     , Abundance := sum(Abundance), by = c("CdStation", "NomTaxo", "Date_PrelBio")])
   Inv <- unique(Inv[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "NomTaxo", "Year")][
-    , .(Group, CdStation, NomTaxo, Year, Abundance)])
+    , .(Group, CdStation, NomTaxo, Year, Date_PrelBio, Abundance)])
   
   Inv <- unique(Inv[
     , c("Nspecies", Inds, "Bias_Estimator") := c(uniqueN(NomTaxo), Indexes_measure(Abundance)), 
-    by = c("CdStation","Year")][ ,.(Group, CdStation, Year, Nspecies, Richness, Shannon, Simpson)])
+    by = c("CdStation","Year")][ ,.(Group, CdStation, Year, Date_PrelBio, Nspecies, Richness, Shannon, Simpson)])
   Inv[Richness == Inf, Richness := Nspecies]
   
   Inv <- merge(Inv, 

@@ -9,25 +9,6 @@ files <- list.files(dir)
 lapply(paste0(dir,files[setdiff(grep("_Inventories", files),grep(".csv", files))]), load, .GlobalEnv)
 load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
-#Old, lapply version
-#####
-DiatomTaxo <- lapply(unique(AllInv_Diatom$CdStation), function(stat){
-  Stat <- AllInv_Diatom[CdStation == stat]
-  
-  Ret <- do.call(rbind,lapply(unique(Stat$Year), function(yr){
-    Stat_yr <- Stat[Year == yr]
-    ret <- tryCatch({unlist(lapply(0:2, function(Q){round(expq(bcTsallis(as.AbdVector(Stat_yr$Abundance),q=Q,Correction = "UnveilC"),q=Q),2)}))},
-                    
-                    error = function(e) tryCatch({unlist(lapply(0:2, function(Q){round(expq(bcTsallis(as.AbdVector(Stat_yr$Abundance),q=Q,Correction = "ChaoShen"),q=Q),2)}))},
-                                                 error = function(e) {print(paste("Other problem", stat))}))
-    names(ret) <- c("Richness", "Shannon", "Simpson")
-    return(ret)
-  }))
-  Ret$Cdstation <- stat
-  return(Ret)})
-save(DiatomTaxo, file = "TaxonomicBiodiv_Diatom")
-#####
-
 Inds <- c("Richness", "Shannon", "Simpson")
 
 Indexes_measure <- function(X){
@@ -69,31 +50,40 @@ Index_Taxo <- lapply(c("Fish", "Macroinvertebrate", "Diatom"), function(compartm
        file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/DiversityTaxonomic_", compartment))
   })
 
-Index_Taxo_Diatom <- Inventory_taxo(Inv = AllInv_Diatom)
-save(Index_Taxo_Diatom, file = "TaxonomicBiodiv_Diatom")
+DiversityTaxonomic_Diatom <- Inventory_taxo(Inv = AllInv_Diatom)[,COMPARTMENT := toupper(Group)]
+save(DiversityTaxonomic_Diatom, file = "DiversityTaxonomic_DiatomLimited")
 
-Index_Taxo_Macroinvertebrate <- Inventory_taxo(AllInv_Macroinvertebrate)
-save(Index_Taxo_Macroinvertebrate, file = "TaxonomicBiodiv_Macroinvertebrate")
+DiversityTaxonomic_Macroinvertebrate <- Inventory_taxo(AllInv_Macroinvertebrate)[,COMPARTMENT := toupper(Group)]
+save(DiversityTaxonomic_Macroinvertebrate, file = "DiversityTaxonomic_2401_Macroinvertebrate")
 
-Index_Taxo_Fish <- Inventory_taxo(AllInv_Fish)
-save(Index_Taxo_Fish, file = "TaxonomicBiodiv_Fish")
+DiversityTaxonomic_Fish <- Inventory_taxo(AllInv_Fish)[,COMPARTMENT := toupper(Group)]
+save(DiversityTaxonomic_Fish, file = "DiversityTaxonomic_2401_Fish")
 
+load("DiversityTaxonomic_2401_DiatomLimited")
+setnames(DiversityTaxonomic_Diatom[,COMPARTMENT := toupper(Group)], 
+         setdiff(colnames(DiversityTaxonomic_Fish),c("Group","CdStation","ID_AMOBIO_START","Year")),
+         paste0("B_FISH_",setdiff(colnames(DiversityTaxonomic_Fish),c("Group","CdStation","ID_AMOBIO_START","Year"))))
 ##
+
+
 # Diatoms supplementary taxo
-dir <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/"
-load(paste0(dir,"Diatom_Inventories"))
-load("../SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/Diatom_Inventories")
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityTaxonomic_DiatomLimited")
 
 Inv <- unique(AllInv_Diatom[,.(Group, CdStation, Year, Date_PrelBio, NomLatin_Simple, Genus, Abundance)][
   , Abundance := sum(Abundance), by = c("CdStation", "NomLatin_Simple", "Genus", "Date_PrelBio")])
+Inv[, NomLatin_Simple := sub("(", "", NomLatin_Simple, fixed = T)]
+Inv[, NomLatin_Simple := sub(")", "", NomLatin_Simple, fixed = T)]
+Inv[, Genus := sub("(", "", Genus, fixed = T)]
+Inv[, Genus := sub(")", "", Genus, fixed = T)]
 Inv <- unique(Inv[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "NomLatin_Simple", "Year")][
   , .(Group, CdStation, NomLatin_Simple, Genus, Date_PrelBio, Year, Abundance)])
 
 Inv <- unique(Inv[, Ngenus := sum(Abundance), by = c("CdStation", "Year", "Genus")][
-    , Abdgenus := Ngenus/sum(Abundance), by = c("CdStation", "Year")][
+  , Abdgenus := Ngenus/sum(Abundance), by = c("CdStation", "Year")][
     , Rgenus := as.numeric(uniqueN(NomLatin_Simple)), by = c("CdStation", "Year", "Genus")][
-    , Rgenus := as.numeric(Rgenus/uniqueN(NomLatin_Simple)), by = c("CdStation", "Year")][
-    , .(Group, CdStation, Date_PrelBio, Year, Genus, Abdgenus, Rgenus)])
+      , Rgenus := as.numeric(Rgenus/uniqueN(NomLatin_Simple)), by = c("CdStation", "Year")][
+        , .(Group, CdStation, Date_PrelBio, Year, Genus, Abdgenus, Rgenus)])
 
 Inv <- dcast(Inv, Group + CdStation + Date_PrelBio + Year ~ Genus, value.var = c("Abdgenus", "Rgenus"))
 Inv[is.na(Inv),] <-0
@@ -104,13 +94,17 @@ Inv[, grep("Abnormal", colnames(Inv), value = T) := NULL]
 cols <- setdiff(colnames(Inv), c("Group", "CdStation", "Date_PrelBio", "Year"))
 Inv <- Inv[,  lapply(.SD, mean), .SDcols = cols, by = c("Group", "CdStation","Year")]
 
-SuppTaxo_Diatom <- merge(Inv, 
-             unique(as.data.table(list_station_filter5_clean)[COMPARTIMENT_START == toupper(unique(Inv$Group)), 
-                    .(ID_AMOBIO_START, ID_START)]), by.x = "CdStation", by.y = "ID_START", all.x = T)[
-                     ,c("Group", "CdStation", "ID_AMOBIO_START", "Year", grep("B_DIA", colnames(Inv), value = T)), with = F]
+DiversityTaxonomic_Diatom <- merge(Inv, DiversityTaxonomic_Diatom, by= c("Group", "CdStation", "Year"))
 
-save(SuppTaxo_Diatom, file = 
-       "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Diatom_SuppTaxo")
+save(DiversityTaxonomic_Diatom, file = 
+       "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityTaxonomic_2401_Diatom")
+
+
+
+
+
+
+
 
 
 ##

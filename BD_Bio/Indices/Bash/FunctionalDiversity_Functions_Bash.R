@@ -43,103 +43,99 @@ Split_Inv <- function(Inventory, Slice, N_Slices){
                                                            ceiling(uniqueN(Inventory$CdStation)/N_slices)))
    return(Inventory[CdStation %in% SplitList[[Slice]]])}
 
-
-Indexes_measure_fun <- function(Abce, Names, Dissim){
+Indexes_measure_fun <- function(Abce, Names, Dissim, Hill){
   
-  ret <- tryCatch({lapply(0:2, function(Q){round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
-                                                          Dissim, Correction = "None"), q=Q),2)})},
-                  
-                  error = function(e) {print(e)})
+  ret <- tryCatch({lapply(0:2, function(Q){
+    ifelse(Hill,round(expq(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
+                               Dissim, Correction = "None"), q=Q),2),
+           round(Hqz(as.AbdVector(setNames(Abce, Names)), q=Q, 
+                     Dissim, Correction = "None"),2))
+  })},
+  error = function(e) {print(e)})
   return(ret)
 }
 
 
-Inventory_Functional_long <- function(Code, Inventory, Traits) {
+Inventory_Functional_long <- function(Code, Inventory, Traits, hill) {
   
   Inventory <- unique(Inventory[,.(Group, CdStation, Year, Date_PrelBio, CdAppelTaxon_Join, Abundance)][
     , Abundance := sum(Abundance), by = c("CdStation", "CdAppelTaxon_Join", "Date_PrelBio")])
   Inventory <- unique(Inventory[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "CdAppelTaxon_Join", "Year")][
-    , .(Group, CdStation, CdAppelTaxon_Join, Year, Abundance)])
+    , .(CdStation, CdAppelTaxon_Join, Date_PrelBio, Year, Abundance)])
   
   Functional_tree <- unique(Traits)[, c("CdAppelTaxon", grep(paste(Code$Trait, collapse = "|"), colnames(Traits), value = T)),
                                     with = F]
   
-  pb <- txtProgressBar(min = 0, max = uniqueN(Code$Trait)*2 + 1, style = 3)
+  Indices_Modalite <- lapply(unique(Code$Trait), function (trait) {
+    
+    ret <- lapply(Code[Trait == trait, Modalite], function(modalite){
+      
+      Inv <- copy(Inventory)
+      
+      Tree <- Functional_tree[, modalite, with = F][, (modalite) := lapply(.SD, function(i){i[is.na(i)] <- 0; i}), 
+                                                    .SDcols = modalite][, lapply(.SD, as.factor)]
+      
+      dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
+      dissim_trait <- 1 - dissim_trait/max(dissim_trait)
+      
+      Inv[, paste0(c("R_Mod_", "Sh_Mod_", "Si_Mod_"), modalite) := Indexes_measure_fun(Abce = Abundance, Names = CdAppelTaxon_Join, 
+                                                                                       Dissim = dissim_trait, Hill = hill), by = c("CdStation", "Date_PrelBio", "Year")]
+      
+      return(unique(Inv[ ,c("CdStation", "Date_PrelBio", "Year", grep(modalite, colnames(Inv), value = T)), with = F]))
+    })
+    
+    ret <- tryCatch({
+      Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), ret)},
+      warning = function(w) {print(paste(w, "\n", "On trait", trait))},
+      error = function(e) {print(paste(e, "\n", "On trait", trait))})
+    
+    return(ret)
+    
+  })
   
-   Indices_Modalite <- lapply(unique(Code$Trait), function (trait) {
-      
-      ret <- lapply(Code[Trait == trait, Modalite], function(modalite){
-        
-        Inv <- copy(Inventory)
-        
-        Tree <- Functional_tree[, modalite, with = F][, (modalite) := lapply(.SD, function(i){i[is.na(i)] <- 0; i}), 
-                                                      .SDcols = modalite][, lapply(.SD, as.factor)]
-        
-        dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
-        dissim_trait <- 1 - dissim_trait/max(dissim_trait)
-        
-        Inv[, paste0(c("R_Mod_", "Sh_Mod_", "Si_Mod_"), modalite) := Indexes_measure_fun(Abce = Abundance, Names = CdAppelTaxon_Join, 
-             Dissim = dissim_trait), by = c("CdStation","Year")]
-        
-        return(unique(Inv[ ,c("CdStation", "Year", grep(modalite, colnames(Inv), value = T)), with = F]))
-        })
-        
-      setTxtProgressBar(pb, which(unique(Code$Trait) == trait))
-      
-      ret <- tryCatch({
-        Reduce(function(...) merge(..., by = c("CdStation", "Year")), ret)},
-              warning = function(w) {print(paste(w, "\n", "On trait", trait))},
-              error = function(e) {print(paste(e, "\n", "On trait", trait))})
-      
-      return(ret)
-      
-      })
-      
-   Indices_Modalite <- tryCatch({
-     Reduce(function(...) merge(..., by = c("CdStation", "Year")), Indices_Modalite)},
-     warning = function(w){ print(paste(w, "\n", "On Modalite"))},
-     error = function(e){ print(paste(e, "\n", "On Modalite"))})
-   
-   
-   Indices_Trait <- lapply(unique(Code$Trait), function (trait) {
-     
-     Inv <- copy(Inventory)
-     
-       Tree <- Functional_tree[, Code[Trait == trait, Modalite], with = F][
-         , (Code[Trait == trait, Modalite]) := lapply(.SD, function(i){i[is.na(i)] <- 0; i}), 
-         .SDcols = Code[Trait == trait, Modalite]][, lapply(.SD, as.factor)]
-       
-       dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
-       dissim_trait <- 1 - dissim_trait/max(dissim_trait)
-       
-       Inv[, paste0(c("R_Tr_", "Sh_Tr_", "Si_Tr_"), trait) := Indexes_measure_fun(Abce = Abundance,
-                Names = CdAppelTaxon_Join, Dissim = dissim_trait), by = c("CdStation","Year")]
-       
-       setTxtProgressBar(pb, which(unique(Code$Trait) == trait) + uniqueN(Code$Trait))
-       
-       return(unique(Inv[ , c("CdStation", "Year",  grep(trait, colnames(Inv), value = T)), with = F]))
-     })
-     
-   Indices_Trait <- tryCatch({
-     Reduce(function(...) merge(..., by = c("CdStation", "Year")), Indices_Trait)},
-                                warning = function(w){ print(paste(w, "\n", "On Trait"))},
-                                error = function(e){ print(paste(e, "\n", "On Trait"))}) 
-   
-   Tree <- Functional_tree[, !"CdAppelTaxon"][, lapply(.SD, function(i){i[is.na(i)] <- 0; as.factor(i)})]
-     
-   dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
-   dissim_trait <- 1 - dissim_trait/max(dissim_trait)
-     
-   Indices_Total <- Inventory[, c("R_all", "Sh_all", "Si_all") := Indexes_measure_fun(Abce = Abundance,
-                                Names = CdAppelTaxon_Join, Dissim = dissim_trait), by = c("CdStation","Year")]
-     
-   Indices_Total <- unique(Indices_Total[ ,c("CdStation", "Year", "R_all", "Sh_all", "Si_all"), with = F])
-
-
-  return(Reduce(function(...) merge(..., by = c("CdStation", "Year")), 
+  Indices_Modalite <- tryCatch({
+    Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), Indices_Modalite)},
+    warning = function(w){ print(paste(w, "\n", "On Modalite"))},
+    error = function(e){ print(paste(e, "\n", "On Modalite"))})
+  
+  
+  Indices_Trait <- lapply(unique(Code$Trait), function (trait) {
+    
+    Inv <- copy(Inventory)
+    
+    Tree <- Functional_tree[, Code[Trait == trait, Modalite], with = F][
+      , (Code[Trait == trait, Modalite]) := lapply(.SD, function(i){i[is.na(i)] <- 0; i}), 
+      .SDcols = Code[Trait == trait, Modalite]][, lapply(.SD, as.factor)]
+    
+    dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
+    dissim_trait <- 1 - dissim_trait/max(dissim_trait)
+    
+    Inv[, paste0(c("R_Tr_", "Sh_Tr_", "Si_Tr_"), trait) := Indexes_measure_fun(Abce = Abundance,
+                                                                               Names = CdAppelTaxon_Join, Dissim = dissim_trait, Hill = hill), 
+        by = c("CdStation", "Date_PrelBio", "Year")]
+    
+    return(unique(Inv[ , c("CdStation", "Date_PrelBio", "Year",  grep(trait, colnames(Inv), value = T)), with = F]))
+  })
+  
+  Indices_Trait <- tryCatch({
+    Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), Indices_Trait)},
+    warning = function(w){ print(paste(w, "\n", "On Trait"))},
+    error = function(e){ print(paste(e, "\n", "On Trait"))}) 
+  
+  Tree <- Functional_tree[, !"CdAppelTaxon"][, lapply(.SD, function(i){i[is.na(i)] <- 0; as.factor(i)})]
+  
+  dissim_trait <- as.matrix(daisy(data.frame(Tree, row.names = Functional_tree[,CdAppelTaxon]), metric="gower"))
+  dissim_trait <- 1 - dissim_trait/max(dissim_trait)
+  
+  Indices_Total <- Inventory[, c("R_all", "Sh_all", "Si_all") := Indexes_measure_fun(Abce = Abundance,
+                                                                                     Names = CdAppelTaxon_Join, Dissim = dissim_trait, Hill = hill),
+                             by = c("CdStation", "Date_PrelBio", "Year")]
+  
+  Indices_Total <- unique(Indices_Total[ ,c("CdStation", "Date_PrelBio", "Year", "R_all", "Sh_all", "Si_all"), with = F])
+  
+  return(Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), 
                 list(Indices_Modalite, Indices_Trait, Indices_Total)))
 }
-
 
 
 

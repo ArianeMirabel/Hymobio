@@ -107,7 +107,7 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
   Inventory <- unique(Inventory[,.(Group, CdStation, Year, Date_PrelBio, CdAppelTaxon_Join, Abundance)][
     , Abundance := sum(Abundance), by = c("CdStation", "CdAppelTaxon_Join", "Date_PrelBio")])
   Inventory <- unique(Inventory[, Abundance := ceiling(mean(Abundance)), by =c("CdStation", "CdAppelTaxon_Join", "Year")][
-    , .(CdStation, CdAppelTaxon_Join, Year, Abundance)])
+    , .(CdStation, CdAppelTaxon_Join, Date_PrelBio, Year, Abundance)])
   
   Functional_tree <- unique(Traits)[, c("CdAppelTaxon", grep(paste(Code$Trait, collapse = "|"), colnames(Traits), value = T)),
                                     with = F]
@@ -127,15 +127,15 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
         dissim_trait <- 1 - dissim_trait/max(dissim_trait)
         
         Inv[, paste0(c("R_Mod_", "Sh_Mod_", "Si_Mod_"), modalite) := Indexes_measure_fun(Abce = Abundance, Names = CdAppelTaxon_Join, 
-             Dissim = dissim_trait, Hill = hill), by = c("CdStation","Year")]
+             Dissim = dissim_trait, Hill = hill), by = c("CdStation", "Date_PrelBio", "Year")]
         
-        return(unique(Inv[ ,c("CdStation", "Year", grep(modalite, colnames(Inv), value = T)), with = F]))
+        return(unique(Inv[ ,c("CdStation", "Date_PrelBio", "Year", grep(modalite, colnames(Inv), value = T)), with = F]))
         })
         
       setTxtProgressBar(pb, which(unique(Code$Trait) == trait))
       
       ret <- tryCatch({
-        Reduce(function(...) merge(..., by = c("CdStation", "Year")), ret)},
+        Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), ret)},
               warning = function(w) {print(paste(w, "\n", "On trait", trait))},
               error = function(e) {print(paste(e, "\n", "On trait", trait))})
       
@@ -144,7 +144,7 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
       })
       
    Indices_Modalite <- tryCatch({
-     Reduce(function(...) merge(..., by = c("CdStation", "Year")), Indices_Modalite)},
+     Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), Indices_Modalite)},
      warning = function(w){ print(paste(w, "\n", "On Modalite"))},
      error = function(e){ print(paste(e, "\n", "On Modalite"))})
    
@@ -161,15 +161,16 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
        dissim_trait <- 1 - dissim_trait/max(dissim_trait)
        
        Inv[, paste0(c("R_Tr_", "Sh_Tr_", "Si_Tr_"), trait) := Indexes_measure_fun(Abce = Abundance,
-                Names = CdAppelTaxon_Join, Dissim = dissim_trait), by = c("CdStation","Year")]
+                Names = CdAppelTaxon_Join, Dissim = dissim_trait, Hill = hill), 
+           by = c("CdStation", "Date_PrelBio", "Year")]
        
        setTxtProgressBar(pb, which(unique(Code$Trait) == trait) + uniqueN(Code$Trait))
        
-       return(unique(Inv[ , c("CdStation", "Year",  grep(trait, colnames(Inv), value = T)), with = F]))
+       return(unique(Inv[ , c("CdStation", "Date_PrelBio", "Year",  grep(trait, colnames(Inv), value = T)), with = F]))
      })
      
    Indices_Trait <- tryCatch({
-     Reduce(function(...) merge(..., by = c("CdStation", "Year")), Indices_Trait)},
+     Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), Indices_Trait)},
                                 warning = function(w){ print(paste(w, "\n", "On Trait"))},
                                 error = function(e){ print(paste(e, "\n", "On Trait"))}) 
    
@@ -179,12 +180,14 @@ Inventory_Functional_long <- function(Code, Inventory, Traits, hill = TRUE) {
    dissim_trait <- 1 - dissim_trait/max(dissim_trait)
      
    Indices_Total <- Inventory[, c("R_all", "Sh_all", "Si_all") := Indexes_measure_fun(Abce = Abundance,
-                                Names = CdAppelTaxon_Join, Dissim = dissim_trait), by = c("CdStation","Year")]
+                                Names = CdAppelTaxon_Join, Dissim = dissim_trait, Hill = hill),
+                              by = c("CdStation", "Date_PrelBio", "Year")]
      
-   Indices_Total <- unique(Indices_Total[ ,c("CdStation", "Year", "R_all", "Sh_all", "Si_all"), with = F])
+   Indices_Total <- unique(Indices_Total[ ,c("CdStation", "Date_PrelBio", "Year", "R_all", "Sh_all", "Si_all"), with = F])
+   
+   setTxtProgressBar(pb, uniqueN(Code$Trait)*2 + 1)
 
-
-  return(Reduce(function(...) merge(..., by = c("CdStation", "Year")), 
+  return(Reduce(function(...) merge(..., by = c("CdStation", "Date_PrelBio", "Year")), 
                 list(Indices_Modalite, Indices_Trait, Indices_Total)))
 }
 

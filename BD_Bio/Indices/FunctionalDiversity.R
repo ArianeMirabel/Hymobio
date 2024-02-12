@@ -24,12 +24,24 @@ Index_Fun <- Inventory_Functional_long(
 Index_Fun <- left_join(Index_Fun, 
                        unique(as.data.table(list_station_filter5_clean)[COMPARTIMENT_START == toupper(compartment), 
                        .(ID_AMOBIO_START, ID_START)]), by = c("CdStation" = "ID_START"))[
-            ,c("Group", "CdStation", "ID_AMOBIO_START", "Year", grep("R_|Sh_|Si_", colnames(Index_Fun), value = T)), with = F]
+            ,c("Group", "CdStation", "ID_AMOBIO_START", "Date_PrelBio", "Year", grep("R_|Sh_|Si_", colnames(Index_Fun), value = T)), with = F]
 
-save(Index_Fun, file = paste("Dfun_Janv24", compartment, slice, sep = "_"))
+if(compartment == "Fish"){pref = "B_FISH"}
+if(compartment == "Macroinvertebrate"){pref = "B_INV"}
+if(compartment == "Diatom"){pref = "B_DIA"}
+setnames(Index_Fun, grep("R_|Sh_|Si_", colnames(Index_Fun), value = T), 
+         paste0(pref, grep("R_|Sh_|Si_", colnames(Index_Fun), value = T)))
+
+save(Index_Fun, file = paste("Dfun_2401", compartment, slice, sep = "_"))
 
 
-TSI <- do.call(rbind,lapply(1:5, function(slice){
+lapply(c("Fish", "Macroinvertebrate", "Diatom"), function(compartment){
+  
+  if(compartment == "Fish"){pref<-"B_FISH_"}
+  if(compartment == "Macroinvertebrate"){pref<-"B_INV_"}
+  if(compartment == "Diatom"){pref<-"B_DIA_"}
+  
+  assign(paste0("TSI_", compartment),do.call(rbind,lapply(1:N_slices, function(slice){
   invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
   
   AllInv_slice <- Split_Inv(Inventory = get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),],
@@ -39,9 +51,14 @@ TSI <- do.call(rbind,lapply(1:5, function(slice){
     Code = get(paste0("Code_",compartment))[Modalite %in% colnames(get(paste0("Traits_",compartment)))],
     Inventory = AllInv_slice, 
     Traits = get(paste0("Traits_",compartment))))
-}))
+})))
+  setnames(get(paste0("TSI_", compartment)), grep("TSI", colnames(get(paste0("TSI_", compartment))), value = T),
+           paste0(pref, grep("TSI", colnames(get(paste0("TSI_", compartment))), value = T)))
+  save(list = paste0("TSI_", compartment), 
+       file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TSI_2401_", compartment))
+  
 
-NicheOverlap <- do.call(rbind,lapply(1:5, function(slice){
+assign(paste0("NicheOverlap_", compartment),do.call(rbind,lapply(1:N_slices, function(slice){
   invisible(load_CompartmentFiles(Directory = directory, Compartment = compartment))
   
   AllInv_slice <- Split_Inv(Inventory = get(paste0("AllInv_",compartment))[!is.na(CdAppelTaxon_Join),],
@@ -51,25 +68,62 @@ NicheOverlap <- do.call(rbind,lapply(1:5, function(slice){
     Code = get(paste0("Code_",compartment))[Modalite %in% colnames(get(paste0("Traits_",compartment)))],
     Inventory = AllInv_slice, 
     Traits = get(paste0("Traits_",compartment))))
-}))
+})))
+setnames(get(paste0("NicheOverlap_", compartment)), grep("meanNO", colnames(get(paste0("NicheOverlap_", compartment))), value = T),
+         paste0(pref, grep("meanNO", colnames(get(paste0("NicheOverlap_", compartment))), value = T)))
+
+save(list = paste0("NicheOverlap_", compartment), 
+     file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/NicheOverlap_2401_", compartment))
+
+
+})
 
 #Save functional
 #####
 lapply(c("Fish", "Macroinvertebrate", "Diatom"),function(compartment){
   assign(paste0("DiversityFunctional_", compartment),
-  do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun",
+  do.call(rbind, lapply(paste("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/Dfun_2401_",
   compartment, 1:N_slices, sep = "_"), function(file){load(file); return(Index_Fun)})
 ))
+  
+  load(paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/NicheOverlap_2401_", compartment))
+  load(paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TSI_2401_", compartment))
+  
   assign(paste0("DiversityFunctional_", compartment),
          merge(merge(
-           get(paste0("DiversityFunctional_", compartment)), TSI, by = c("CdStation", "Year")),
-           NicheOverlap, by = c("CdStation", "Year")))
+           get(paste0("DiversityFunctional_", compartment)), 
+           get(paste0("TSI_", compartment)), by = c("CdStation", "Year")),
+           get(paste0("NicheOverlap_", compartment)), by = c("CdStation", "Year")))
   
+  
+  if(compartment == "Fish"){get(paste0("DiversityFunctional_", compartment))[, COMPARTMENT := "FISH"]}
+  if(compartment == "Macroinvertebrate"){get(paste0("DiversityFunctional_", compartment))[, COMPARTMENT := "MACROINVERTEBRATE"]}
+  if(compartment == "Diatom"){get(paste0("DiversityFunctional_", compartment))[, COMPARTMENT := "DIATOM"]}
+  
+  bys <- c("CdStation", "Year", "Group", "COMPARTMENT", "ID_AMOBIO_START")
+  get(paste0("DiversityFunctional_", compartment))[
+    ,Date_PrelBio := NULL][,setdiff(names(get(paste0("DiversityFunctional_",compartment))), bys) := lapply(.SD, function(X){mean(X,na.rm = T)}), by = bys, 
+                           .SDcols = setdiff(names(get(paste0("DiversityFunctional_",compartment))), bys)]
+
   save(list = paste0("DiversityFunctional_", compartment), 
-  file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_", compartment))
+  file = paste0("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_", compartment))
 
   })
 #####
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_Fish")
+DiversityFunctional_Fish <- unique(DiversityFunctional_Fish)
+save(DiversityFunctional_Fish, 
+     file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_Fish")
+
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_Macroinvertebrate")
+DiversityFunctional_Macroinvertebrate <- unique(DiversityFunctional_Macroinvertebrate)
+save(DiversityFunctional_Macroinvertebrate, 
+     file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_Macroinvertebrate")
+
+load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_Diatom")
+DiversityFunctional_Diatom <- unique(DiversityFunctional_Diatom)
+save(DiversityFunctional_Diatom, 
+     file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/DiversityFunctional_2401_Diatom")
 
 # Test with entropy
 #####

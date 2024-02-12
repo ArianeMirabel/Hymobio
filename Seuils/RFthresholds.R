@@ -1,73 +1,38 @@
+#!/usr/bin/Rscript 
 invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel", "dplyr"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
+Nslice <- 1
+
+load("HYMOBIO_FULLDATA_202401.RData")
+
 Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
-
-load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20231123.Rdata")
-RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[, H_Ncrue_S1_ALL := NULL]
-
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Janv24_Diatom")
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Diatom_SuppTaxo")
-Index_Taxo_Diatom <- merge(Index_Taxo_Diatom, SuppTaxo_Diatom, by = c("Group", "CdStation", "ID_AMOBIO_START", "Year"))
-save(Index_Taxo_Diatom, file = "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/TaxonomicBiodiv_Janv24_Diatom")
-
-
-grep("B_FISH", colnames(RFD_all), value = T)
-directory <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/"
-lapply(paste0(directory,grep("Janv24",list.files(directory), value =T)), load, .GlobalEnv)
-
-
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro/HydroIndex_36125all_AM_20232911")
-RFD_all <- left_join(RFD_all, 
-                         Hydrolaps[, c("ID_AMOBIO_START", "Samp_date", grep("Ncrues|Netiage", colnames(Hydrolaps), value = T)), with = F],
-                         by = c("ID" = "ID_AMOBIO_START", "DATE_OPERATION" = "Samp_date"))
-colnames(RFD_all) <- sub(" ", "_", colnames(RFD_all))
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/FinalMAJ_Naiades.Alric.Traits/SuppTaxo_Diatom")
-RFD_all <- left_join(RFD_all, 
-                     SuppTaxo_Diatom[, c("ID_AMOBIO_START", "Date_PrelBio", grep("B_DIA", colnames(SuppTaxo_Diatom), value = T)), with = F],
-                     by = c("ID" = "ID_AMOBIO_START", "DATE_OPERATION" = "Date_PrelBio"))
-RFD_all <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T), with = F]
-RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
-save(RFD_all, file = "HYMOBIO_FULLDATA_20240112.RData")
-rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"));
-
-
-Nslice <- 3
-
-load("HYMOBIO_FULLDATA_20240112.RData")
-#Params <- paste(Catalog$Category, Catalog$Name, sep = "_")
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
 
-#Params <- setdiff(Params, gsub("AUC_threshold_", "",list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils/Genomig_Output")))
-
 for(param in Params){
   
-  print(param)
-  
-    RFD_all <- RFD_all[, grep(paste0("B_DIA",param), colnames(RFD_all), value = T), with = F]
-    Thresholds <- seq(from = range(RFD_all[,..param], na.rm = T)[1], to = range(RFD_all[,..param], na.rm = T)[2], length.out = 10)
+  RFD <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T), with = F]
+  Thresholds <- seq(from = range(RFD[,..param], na.rm = T)[1], to = range(RFD[,..param], na.rm = T)[2], length.out = 10)
 
-if(!is.na(Catalog[NameOrigin == param,LittThreshold])){
-  Thresholds[which.min(abs(Thresholds-as.numeric(Catalog[NameOrigin == param,LittThreshold])))] <- Catalog[NameOrigin == param,LittThreshold]
-}
+  if(!is.na(Catalog[NameOrigin == param,LittThreshold])){
+    Thresholds[which.min(abs(Thresholds-as.numeric(Catalog[NameOrigin == param,LittThreshold])))] <- Catalog[NameOrigin == param,LittThreshold]
+    }
 
-Thresh_draw <- lapply(Thresholds, function(Thresh){
-         
-         pb <- txtProgressBar(min = 0, max = 10, style = 3)
-         setTxtProgressBar(pb, which(Thresholds == Thresh))
-         
-Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
+  Thresh_draw <- lapply(Thresholds, function(Thresh){
   
-  Rfd_comp <- RFD_all[, grep(paste0(comp,"|State|",param), colnames(RFD_all), value = T), with = F]
-  Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]
-  Rfd_comp <- Rfd_comp[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
-  , State := as.factor(State)]
+     Rfd <- RFD[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
+       , State := as.factor(State)]
   
- if(!any(c(nrow(Rfd_comp[State == "good"]), nrow(Rfd_comp[State == "bad"])) < 50) & uniqueN(Rfd_comp$State) > 1){
+     Thresh_AUC <- lapply(c("B_FISH", "B_INV","B_DIA"), function(comp){
+  
+       Rfd_comp <- Rfd[, grep(paste0(comp,"|State|",param), colnames(Rfd), value = T), with = F]
+       Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]
+  
+       if(!any(c(nrow(Rfd_comp[State == "good"]), nrow(Rfd_comp[State == "bad"])) < 50) & uniqueN(Rfd_comp$State) > 1){
       
       set.seed(1)
       Rfd_comp[, Cross_grp := sample(x=1:10, nrow(Rfd_comp),replace=TRUE)]
@@ -87,21 +52,31 @@ Thresh_AUC <- lapply(c("B_FISH", "B_INV", "B_DIA"), function(comp){
                              warning = function(w) {print(paste(w, "Cross val on threshold", Thresh, "for", param))},
                              error = function(e) {print(paste(e, "Cross val on threshold", Thresh, "for", param))})
         
-        AUC_cross <- performance(prediction(
+        AUC_crossTest <- performance(prediction(
           as.numeric(predict(rf_cross, 
           Cross_test)), Cross_test$State),"auc")
         
-        return(AUC_cross@y.values[[1]])
+        AUC_crossTrain <- performance(prediction(
+          as.numeric(predict(rf_cross, 
+                             Cross_train)), Cross_train$State),"auc")
+        
+        return(data.frame(Test = AUC_crossTest@y.values[[1]], Train = AUC_crossTrain@y.values[[1]]))
         
         } else {return(NA)}
         
       }) 
       
-    return(data.frame(AUC_val = mean(do.call(c,AUC_10Cross), na.rm = T),
-                      Low = quantile(do.call(c,AUC_10Cross), probs = 0.05, na.rm = T),
-                      Up = quantile(do.call(c,AUC_10Cross), probs = 0.95, na.rm = T),
-                      Threshold = Thresh,
-                      Compartment = comp))
+      AUC_10CrossTest <- lapply(AUC_10Cross, function(cross){return(cross["Test"])})
+      AUC_10CrossTrain <- lapply(AUC_10Cross, function(cross){return(cross["Train"])})
+      
+      return(data.frame(AUC_valTest = mean(do.call(c,AUC_10CrossTest), na.rm = T),
+                        LowTest = quantile(do.call(c,AUC_10CrossTest), probs = 0.05, na.rm = T),
+                        UpTest = quantile(do.call(c,AUC_10CrossTest), probs = 0.95, na.rm = T),
+                        AUC_valTrain = mean(do.call(c,AUC_10CrossTrain), na.rm = T),
+                        LowTrain = quantile(do.call(c,AUC_10CrossTrain), probs = 0.05, na.rm = T),
+                        UpTrain = quantile(do.call(c,AUC_10CrossTrain), probs = 0.95, na.rm = T),
+                        Threshold = Thresh,
+                        Compartment = comp))
       
     } else {print(paste("Not enough data for", which(Thresholds == Thresh)));return(NA)}
     
