@@ -3,7 +3,7 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest",
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-Nslice <- 2
+Nslice <- 22
 
 load("HYMOBIO_FULLDATA_202401.RData")
 

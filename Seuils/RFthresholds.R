@@ -16,7 +16,9 @@ Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice
 for(param in Params){
   
   RFD <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T), with = F]
-  Thresholds <- seq(from = range(RFD[,..param], na.rm = T)[1], to = range(RFD[,..param], na.rm = T)[2], length.out = 10)
+  Thresholds <- seq(from = quantile(RFD[,..param], probs = 0.025, na.rm = T), 
+                    to = quantile(RFD[,..param], probs = 0.975, na.rm = T), 
+                    length.out = 20)
 
   if(!is.na(Catalog[NameOrigin == param,LittThreshold])){
     Thresholds[which.min(abs(Thresholds-as.numeric(Catalog[NameOrigin == param,LittThreshold])))] <- Catalog[NameOrigin == param,LittThreshold]
@@ -104,6 +106,24 @@ ggplot(data = Thresh_plot[complete.cases(Thresh_plot),], aes(x = Threshold, y = 
   geom_ribbon(data = Thresh_envelope[complete.cases(Thresh_envelope),], aes(x = Threshold, y= AUC_val, ymax = Up, ymin = Low), 
               color = "white", fill = "olivedrab", alpha = 0.3)
   
+#####
+# Get threshold ranges
+load("HYMOBIO_FULLDATA_202401.RData")
+
+Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
+
+Thresholds <- as.data.table(do.call(rbind,lapply(Params, function(param){
+  
+  RFD <- RFD_all[, ..param]
+  ret <- tryCatch({seq(from = quantile(RFD[,..param], probs = 0.025, na.rm = T), 
+                       to = quantile(RFD[,..param], probs = 0.975, na.rm = T), 
+                       length.out = 20)},
+           error = function(e) {print(e); return(NA)})
+  
+})))[, Name_Origine := Params]
+
+save(Thresholds, file = "variable_thresholds")
   
 
 ## Plot density distributions
