@@ -6,6 +6,7 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
 Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 Titles <- fread("SumUp_Seuil.csv")
+Titles[, Reference_Threshold := as.numeric(gsub(",",".", Reference_Threshold))]
 
 files <- list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils/Genomig_Output")
 
@@ -208,6 +209,7 @@ Threshold_max[, Abs_THRmax := max(THRmaxTest), by = Param][, minTHRmax := min(TH
 Threshold_max[, isTmax := 0][THRmaxTest == Abs_THRmax & Nmax == 1 & Signif == 1, isTmax := 1][, OccMax := sum(isTmax), by = Compartment][
   , isTmin := 0][THRmaxTest == minTHRmax & Nmin == 1 & Signif == 1, isTmin := 1][, OccMin := sum(isTmin), by = Compartment]
 
+## Pies of occurence as first/last
 PpieTmin_t <- unique(Threshold_max[,.(OccMin, Compartment)][order(OccMin)])
 PpieTmin_t[,Compartment := factor(Compartment, levels = PpieTmin_t[order(OccMin, decreasing = T),Compartment])][, prop := OccMin/sum(OccMin)][
   ,Ypos := cumsum(prop)- 0.5*prop]
@@ -230,6 +232,8 @@ PpieTmax <- ggplot(PpieTmax_t, aes(x="", y=prop, fill=Compartment)) +
         panel.grid  = element_blank(), axis.title = element_blank(),  plot.title = element_text(size =9, hjust = 1)) +
   ggtitle("Higest threshold") 
 
+
+## Mean AUC table
 AUCmeans <- unique(Threshold_max[, c("MTest","MTrain", "NTest", "NTrain", "MthreshTest", "MthreshTrain") := 
             list(round(mean(AUCmaxTest, na.rm = T),2), length(which(AUCmaxTest>= 0.7)), 
                  round(mean(AUCmaxTrain, na.rm = T),2), length(which(AUCmaxTrain>= 0.7)),
@@ -247,6 +251,7 @@ t <- tableGrob(AUCmeans[,c("Community", "Mean AUC", "N signif.", "Average\nthres
   core=list(bg_params = list(fill=c(table2$CompartmentCols, rep("grey90", nrow(table2)*(ncol(table2)-1))),
                              alpha = .5)), base_size = 8))
 
+## Barplot of mean AUC and Thresholds
 AUCmeansCat <- merge(Threshold_max, Titles[,.(Name_Origine, Category)], by = "Name_Origine")
 AUCmeansCat <- unique(AUCmeansCat[, c("MTest","MthreshTest") := list(round(mean(AUCmaxTest, na.rm = T),2), round(mean(scaleTHRmaxTest), 2)),
                                  by = c("Compartment", "Category")][,.(Compartment,Category, MTest, MthreshTest)])
@@ -256,16 +261,18 @@ PcatThresh <- dcast(AUCmeansCat[,.(Compartment, Category, MthreshTest)], Compart
 PcatMean <- ggplot(AUCmeansCat, aes(x = Category, y = MTest, fill = Compartment)) +
   geom_col(position = position_dodge(0.6), width = 0.5) + scale_fill_manual(values = CompartmentCols) +
   theme_classic() + labs(x = "", y = "AUC")  + 
-  theme(plot.margin = unit(c(0, 0, 0, 0), "lines"), axis.text.x=element_blank(),
-        legend.position = "none") +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "lines"), axis.text.x=element_blank(), legend.position = "none") +
   geom_hline(yintercept = 0.7, color = "darkgrey", lty = 1) 
 PcatThresh <- ggplot(AUCmeansCat, aes(x = Category, y = MthreshTest, fill = Compartment)) +
   geom_col(position = position_dodge(0.6), width = 0.5) +  theme_classic() + 
-  theme(plot.margin = unit(c(0, 0, 1, 0), "lines"),legend.position = "none") +
+  theme(plot.margin = unit(c(0, 0, 1, 0), "lines"), legend.position = "none") +
   scale_fill_manual(values = CompartmentCols) +
   labs(x = "", y = "Threshold")  
 
+legd_Group <- ggplot_gtable(ggplot_build(PcatThresh + theme(legend.position = "right")))
+legd_Group <- legd_Group$grobs[[which(sapply(legd_Group$grobs, function(x) x$name) == "guide-box")]]
 
+## Radar graphic
 Threshold_max <- do.call(rbind,lapply(Threshold_plot, function(param) {if(length(param[[2]])!=1){return(param[[2]])}}))
 Threshold_max <- as.data.table(merge(Threshold_max[, Name_Origine := gsub(toremove, "", Param)], Titles))
 Threshold_max[, Category := factor(Category, levels = c("Natural Environment", "Hydromorphology", "Hydrology", "Temperature",
@@ -281,14 +288,6 @@ Pradar <- ggradar(background.circle.colour = "white", Pradar, legend.position = 
         fill.alpha = 0.1, group.colours = CompartmentCols, label.gridline.min = F, label.gridline.mid = F,
         label.gridline.max = F)
 
-grid.arrange(arrangeGrob(Pradar, top = "(i) Proportion of significant threshold", padding = unit(0, "line")), 
-             arrangeGrob(t, top = "(ii) Summary", padding = unit(1.5, "line")), 
-             arrangeGrob(PcatMean, PcatThresh, heights = c(2,4.5), 
-                         top = "(iii) Mean AUC and scaled threshold by category and community", padding = unit(2, "line")), 
-             arrangeGrob(Pscales, top = "(iv) Scales significance comparison", padding = unit(2, "line")), 
-             
-             #arrangeGrob(PpieTmin, PpieTmax, ncol = 2, top = textGrob("(iv) Community occurence as:"), padding = unit(0, "line")), 
-             nrow =4, heights = c(3.5,2,4,4))
 
 
 ## Summary table
@@ -317,6 +316,8 @@ Comp1 <- unique(Threshold_max[Nsignif == 1, .(Category, Name, Scale)])
 Multiscale <- unique(Titles[!Category %in% c("Temperature", "Hydrology")][which(duplicated(Name)),Name])
 Multiscale <- unique(Titles[Name %in% Multiscale, Name_Origine])
 
+
+## barplot for scale significance comparison
 Threshold_max <- merge(Threshold_max[, Name_Origine := gsub(toremove, "", Param)], 
                        Thresholds[,.(Name_Origine, minTHR, maxTHR)])
 Threshold_max[, Abs_THRmax := max(THRmaxTest), by = Param][, minTHRmax := min(THRmaxTest), by = Param][
@@ -337,11 +338,55 @@ Pscales <- ggplot(ScaleComp, aes(x = Description, y = meanAUC, fill = Scale, alp
   theme_classic() + labs(x = "", y = "AUC")  +
   facet_grid(. ~ Category, scales = "free_x", space = "free_x", 
              labeller = labeller(Category = setNames(str_wrap(unique(ScaleComp$Category), width = 10),unique(ScaleComp$Category)))) +
-  theme(plot.margin = unit(c(0, 0, 0, 0), "lines"), axis.text.x=element_text(angle = 45, hjust = 1),
-        legend.position = "none") +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "lines"), axis.text.x=element_text(angle = 45, hjust = 1)) +
   geom_hline(yintercept = 0.7, color = "darkgrey", lty = 1) +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) + guides(alpha ="none")
 
+## Difference between literature and observed thresholds
+Threshold_max <- do.call(rbind,lapply(Threshold_plot, function(param) {if(length(param[[2]])!=1){return(param[[2]])}}))
+Threshold_max <- as.data.table(merge(Threshold_max[, Name_Origine := gsub(toremove, "", Param)], Titles))[
+  Reference_Threshold != "",]
+Threshold_max <- merge(Threshold_max[, Name_Origine := gsub(toremove, "", Param)], 
+                       Thresholds[,.(Name_Origine, minTHR, maxTHR)])
+
+DiffThresh <- Threshold_max[, DiffThresh := THRmaxTest - as.numeric(Reference_Threshold)][
+                             , DiffThresh := (DiffThresh-minTHR)/(maxTHR-minTHR)]
+PdiffThreshFull <- ggplot(DiffThresh, aes(x = Description, y = DiffThresh, fill = Compartment)) + 
+  geom_col(position = position_dodge(0.6), width = 0.5) +
+  facet_grid(. ~ Category, scales = "free_x", space = "free_x", 
+             labeller = labeller(Category = setNames(str_wrap(unique(DiffThresh $Category), width = 10),
+                                                     unique(DiffThresh $Category)))) +
+  geom_hline(yintercept = 0, color = "black", lty = 1) +
+  scale_fill_manual(values = CompartmentCols) + theme_classic() + 
+  labs(x = "", y = "Scaled difference w. literature threshold")  +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "lines"), axis.text.x=element_text(angle = 45, hjust = 1),
+        legend.position = "none") + scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  coord_flip()
+
+PdiffThreshLim <- ggplot(DiffThresh, aes(x = Description, y = DiffThresh, fill = Compartment)) + 
+  geom_col(position = position_dodge(0.6), width = 0.5) +
+  facet_grid(. ~ Category, scales = "free_x", space = "free_x", 
+             labeller = labeller(Category = setNames(str_wrap(unique(DiffThresh $Category), width = 10),
+                                                     unique(DiffThresh $Category))))  +
+  geom_hline(yintercept = 0, color = "black", lty = 1) +
+  scale_fill_manual(values = CompartmentCols) + theme_classic() + 
+  labs(x = "", y = "Scaled difference w. literature threshold")  +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "lines"), axis.text.x=element_text(angle = 45, hjust = 1),
+        legend.position = "none") + scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) + ylim(-1, 1) +
+  coord_flip()
+
+grid.arrange(PdiffThreshFull, PdiffThreshLim, nrow = 1)
+
+
+grid.arrange(arrangeGrob(Pradar, top = "(i) Proportion of significant threshold", padding = unit(0, "line")), 
+             arrangeGrob(t, top = textGrob("(ii) Summary", vjust = -0.5), padding = unit(1, "line")), 
+             arrangeGrob(arrangeGrob(PcatMean, PcatThresh, heights = c(2,4.5)), 
+                         top = textGrob("(iii) Mean AUC and scaled threshold by category and community", vjust = 1), 
+                         padding = unit(2, "line"), legd_Group, nrow = 1, widths = c(4,1)), 
+             arrangeGrob(Pscales, top = textGrob("(iv) Scales significance comparison", vjust = -0.5)), 
+             arrangeGrob(PdiffThresh, top =  textGrob("(v) Difference with literature threshold by category", vjust = -0.5)),
+             #arrangeGrob(PpieTmin, PpieTmax, ncol = 2, top = textGrob("(iv) Community occurence as:"), padding = unit(0, "line")), 
+             nrow =5, heights = c(3.5,2,4,4,4))
 
 
 ### Plots for first ppt

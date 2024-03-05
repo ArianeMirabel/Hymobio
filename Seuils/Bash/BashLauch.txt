@@ -26,7 +26,11 @@ find . -type f \( -iname "*.R" \) -exec dos2unix {} +
   nohup ./RFthresholds_Bash19.R &
   nohup ./RFthresholds_Bash20.R &
   nohup ./RFthresholds_Bash21.R &
-  nohup ./RFthresholds_Bash22.R
+  nohup ./RFthresholds_Bash22.R&
+  nohup ./RFthresholds_Bash23.R &
+  nohup ./RFthresholds_Bash24.R &
+  nohup ./RFthresholds_Bash25.R &
+  nohup ./RFthresholds_Bash26.R
   
 ctrl Z => stop stuff
 bg

@@ -33,11 +33,11 @@ colnames(RFD_all) <- sub(")", "", colnames(RFD_all), fixed = T)
 
 save(RFD_all, file = "AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20240212.RData")
 
-Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 
-RFD_all <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T), with = F]
+RFD_all <- RFD_all[, c("ID",grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T)), with = F]
 RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
-save(RFD_all, file = "HYMOBIO_FULLDATA_202401.RData")
+save(RFD_all, file = "../HYMOBIO_FULLDATA_202403.RData")
 rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"))
 
 

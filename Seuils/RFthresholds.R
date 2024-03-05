@@ -7,15 +7,21 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
 Nslice <- 1
 
-load("HYMOBIO_FULLDATA_202401.RData")
+load("../HYMOBIO_FULLDATA_202403.RData")
 
-Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
+Remaining <- setdiff(Params, gsub("AUC_threshold_2402_Quant95_5step_","",
+                     grep("2402_Quant95_5step",list.files("Genomig_Output"), value = T)))
+save(Remaining, file = "RemainingVariables")
+
+load("RemainingVariables")
+Params <- Remaining
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
 
 for(param in Params){
   
-  RFD <- RFD_all[, grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T), with = F]
+  RFD <- RFD_all[, c("ID",grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T)), with = F]
   Thresholds <- seq(from = quantile(RFD[,..param], probs = 0.025, na.rm = T), 
                     to = quantile(RFD[,..param], probs = 0.975, na.rm = T), 
                     length.out = 20)
@@ -31,19 +37,20 @@ for(param in Params){
   
      Thresh_AUC <- lapply(c("B_FISH", "B_INV","B_DIA"), function(comp){
   
-       Rfd_comp <- Rfd[, grep(paste0(comp,"|State|",param), colnames(Rfd), value = T), with = F]
+       Rfd_comp <- Rfd[, c("ID", grep(paste0(comp,"|State|",param), colnames(Rfd), value = T)), with = F]
        Rfd_comp <- Rfd_comp[complete.cases(Rfd_comp)]
   
        if(!any(c(nrow(Rfd_comp[State == "good"]), nrow(Rfd_comp[State == "bad"])) < 50) & uniqueN(Rfd_comp$State) > 1){
       
       set.seed(1)
-      Rfd_comp[, Cross_grp := sample(x=1:10, nrow(Rfd_comp),replace=TRUE)]
-     
-      AUC_10Cross <- lapply(1:10, function(grp){
-       
-        Cross_train <- Rfd_comp[Cross_grp != grp]
-        Cross_test <- Rfd_comp[Cross_grp == grp]
-        
+         
+      AUC_10Cross <- lapply(1:10, function(cross){
+           
+           Train_grp <- sample(unique(Rfd_comp$ID), round(0.2*uniqueN(Rfd_comp$ID)))
+           
+           Cross_train <- Rfd_comp[ID %in% Train_grp]
+           Cross_test <- Rfd_comp[!ID %in% Train_grp]
+           
         if(uniqueN(Cross_train$State) > 1){
            
         rf_cross <- tryCatch({randomForest(State ~ .,
