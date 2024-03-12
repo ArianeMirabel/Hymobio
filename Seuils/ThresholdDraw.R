@@ -4,13 +4,13 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "dplyr", "gridE
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
-Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 Titles <- fread("SumUp_Seuil.csv")
 Titles[, Reference_Threshold := as.numeric(gsub(",",".", Reference_Threshold))]
 
 files <- list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils/Genomig_Output")
 
-load("HYMOBIO_FULLDATA_202401.RData")
+load("../HYMOBIO_FULLDATA_202403.RData")
 
 toremove <- "AUC_threshold_2402_Quant95_5step_"
 
@@ -269,7 +269,7 @@ PcatThresh <- ggplot(AUCmeansCat, aes(x = Category, y = MthreshTest, fill = Comp
   scale_fill_manual(values = CompartmentCols) +
   labs(x = "", y = "Threshold")  
 
-legd_Group <- ggplot_gtable(ggplot_build(PcatThresh + theme(legend.position = "right")))
+legd_Group <- ggplot_gtable(ggplot_build(PcatThresh + theme(legend.position = "right"))) 
 legd_Group <- legd_Group$grobs[[which(sapply(legd_Group$grobs, function(x) x$name) == "guide-box")]]
 
 ## Radar graphic
@@ -328,13 +328,16 @@ ScaleComp <- Threshold_max[Name_Origine %in% Multiscale,
               .(Name_Origine, Name, Description, Category, Scale, AUCmaxTest, scaleTHRmaxTest)]
 ScaleComp[, c("meanAUC", "meanTHR") := list(mean(AUCmaxTest), mean(scaleTHRmaxTest)), by = Name_Origine]
 ScaleComp <- unique(ScaleComp[,.(Description, Category, Name, Scale, meanAUC, meanTHR)])[
-  grep("Hydro area|Proximal", Scale), Scale := "Local"][
-  grep("Upstream subsystem|Downstream stream", Scale), Scale := "Watershed"][
+  grep("Hydro area|Proximal|USRA", Scale), Scale := "Local"][
+    Scale == "Downstream stream to the mouth", Scale := "Linear Downstream"][
+    grep("(edge)", Scale), Scale := "Linear Upstream"][
+    grep("Downstream stream|Upstream subsystem", Scale), Scale := "Watershed"][
     , Signif := ifelse(meanAUC >= 0.7, "Signif", "Nsignif")]
 
 Pscales <- ggplot(ScaleComp, aes(x = Description, y = meanAUC, fill = Scale, alpha = Signif)) +
   geom_col(position = position_dodge(0.6), width = 0.5) + scale_alpha_discrete(range = c(0.5,1)) +
-  scale_fill_manual(values = c("Local" = "burlywood3",  "Watershed" = "brown")) +
+  scale_fill_manual(values = c("Local" = "burlywood3",  "Watershed" = "brown", 
+                               "Linear Upstream" = "royalblue3", "Linear Downstream" = "lightskyblue")) +
   theme_classic() + labs(x = "", y = "AUC")  +
   facet_grid(. ~ Category, scales = "free_x", space = "free_x", 
              labeller = labeller(Category = setNames(str_wrap(unique(ScaleComp$Category), width = 10),unique(ScaleComp$Category)))) +
@@ -384,9 +387,9 @@ grid.arrange(arrangeGrob(Pradar, top = "(i) Proportion of significant threshold"
                          top = textGrob("(iii) Mean AUC and scaled threshold by category and community", vjust = 1), 
                          padding = unit(2, "line"), legd_Group, nrow = 1, widths = c(4,1)), 
              arrangeGrob(Pscales, top = textGrob("(iv) Scales significance comparison", vjust = -0.5)), 
-             arrangeGrob(PdiffThresh, top =  textGrob("(v) Difference with literature threshold by category", vjust = -0.5)),
+             #arrangeGrob(PdiffThresh, top =  textGrob("(v) Difference with literature threshold by category", vjust = -0.5)),
              #arrangeGrob(PpieTmin, PpieTmax, ncol = 2, top = textGrob("(iv) Community occurence as:"), padding = unit(0, "line")), 
-             nrow =5, heights = c(3.5,2,4,4,4))
+             nrow =4, heights = c(3.5,2,4,4))
 
 
 ### Plots for first ppt

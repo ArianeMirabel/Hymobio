@@ -45,8 +45,8 @@ for(param in Params){
                                            scale.permutation.importance = TRUE,
                                            respect.unordered.factors = TRUE,
                                            mtry = 3)},
-                             warning = function(w) {print(paste(w, "Cross val on threshold", Thresh, "for", param))},
-                             error = function(e) {print(paste(e, "Cross val on threshold", Thresh, "for", param))})
+                             warning = function(w) {print(paste(w, "Cross val for", param))},
+                             error = function(e) {print(paste(e, "Cross val for", param))})
         
         AUC_crossTest <- performance(prediction(
           as.numeric(predict(rf_cross, 

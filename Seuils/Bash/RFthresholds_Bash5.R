@@ -3,7 +3,7 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest",
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-Nslice <- 5
+Nslice <- 6
 
 load("HYMOBIO_FULLDATA_202403.RData")
 
@@ -71,16 +71,16 @@ for(param in Params){
         AUC_10CrossTest <- lapply(AUC_10Cross, function(cross){return(cross["Test"])})
         AUC_10CrossTrain <- lapply(AUC_10Cross, function(cross){return(cross["Train"])})
         
-        return(data.frame(AUC_valTest = mean(do.call(c,AUC_10CrossTest), na.rm = T),
-                          LowTest = quantile(do.call(c,AUC_10CrossTest), probs = 0.05, na.rm = T),
-                          UpTest = quantile(do.call(c,AUC_10CrossTest), probs = 0.95, na.rm = T),
-                          AUC_valTrain = mean(do.call(c,AUC_10CrossTrain), na.rm = T),
-                          LowTrain = quantile(do.call(c,AUC_10CrossTrain), probs = 0.05, na.rm = T),
-                          UpTrain = quantile(do.call(c,AUC_10CrossTrain), probs = 0.95, na.rm = T),
+        return(data.frame(AUC_valTest = mean(unlist(AUC_10CrossTest), na.rm = T),
+                          LowTest = quantile(unlist(AUC_10CrossTest), probs = 0.05, na.rm = T),
+                          UpTest = quantile(unlist(AUC_10CrossTest), probs = 0.95, na.rm = T),
+                          AUC_valTrain = mean(unlist(AUC_10CrossTrain), na.rm = T),
+                          LowTrain = quantile(unlist(AUC_10CrossTrain), probs = 0.05, na.rm = T),
+                          UpTrain = quantile(unlist(AUC_10CrossTrain), probs = 0.95, na.rm = T),
                           Threshold = Thresh,
                           Compartment = comp))
         
-      } else {;return(NA)}
+      } else {return(NA)}
       
     })
     
