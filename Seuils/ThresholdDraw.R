@@ -12,8 +12,10 @@ files <- list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatme
 
 load("../HYMOBIO_FULLDATA_202403.RData")
 
-toremove <- "AUC_threshold_2402_Quant95_5step_"
+toremove <- "AUC_threshold_RFtuneTest_Node0005"
 
+
+files <- grep("CatchStruct5_L5", files, value = T)
 files <- grep(toremove, files, value = T)
 Cat <- left_join(data.table(Names = files, Cat = gsub(toremove, "", files), Name_Origine = gsub(toremove, "", files)),
                  Titles[,.(Name_Origine, Description, Category)])
@@ -23,7 +25,11 @@ CompartmentCols <- c("Fish" = "cornflowerblue", "Macroinvertebrate" = "tan2", "D
 #####
 Threshold_plot <- lapply(files, function(param){
   
+  version <- "old"
+  
   load(paste0(getwd(),"/Genomig_Output/",param))
+  
+  if(version == "new"){Thresh_draw <- lapply(Thresh_draw, function(X){return(as.data.frame(X[[1]]))})}
   
   Thresh_plot <- Thresh_draw[unlist(lapply(Thresh_draw, is.data.frame))]
   
@@ -34,11 +40,23 @@ Threshold_plot <- lapply(files, function(param){
   if(length(Thresh_plot) > 0){
     
   Thresh_plot <- as.data.table(do.call(rbind,lapply(Thresh_plot, function(x) {
+    
     x$Threshold <- unique(x$Threshold)[!is.na(unique(x$Threshold))]
     #x <- melt(x, id.vars = c("Threshold", "Compartment"), variable.name = Data)
+    
+    if(version == "old"){
     x <- as.data.table(x)[, grep(c("AUC_val|Low|Up|Threshold"), colnames(x), value = T) := 
                             lapply(.SD, function(col){return(round(as.numeric(col), 2))}), 
                           .SDcols = grep(c("AUC_val|Low|Up|Threshold"), colnames(x), value = T)]
+  } else {
+    x <- as.data.table(x)[, grep(c("_Accuracy|Threshold"), colnames(x), value = T) := 
+                            lapply(.SD, function(col){return(round(as.numeric(col), 2))}), 
+                          .SDcols = grep(c("_Accuracy|Threshold"), colnames(x), value = T)]
+    setnames(x, c("Med_Accuracy_Test", "Low_Accuracy_Test", "Upp_Accuracy_Test", 
+                  "Med_Accuracy_Train", "Low_Accuracy_Train", "Upp_Accuracy_Train"),
+                c("AUC_valTest", "LowTest", "UpTest", "AUC_valTrain", "LowTrain", "UpTrain"))
+    }
+    
     x$Compartment = c("Fish", "Macroinvertebrate", "Diatom"); return(x)})))[
     , Compartment := factor(Compartment, levels = c("Fish", "Macroinvertebrate", "Diatom"))][
     , N := length(which(!is.na(AUC_valTest))), by = Compartment]
