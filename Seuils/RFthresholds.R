@@ -7,21 +7,23 @@ setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
 Nslice <- 1
 
-load("../HYMOBIO_FULLDATA_202403.RData")
+load("../HYMOBIO_FULLDATA_202405.RData")
 
 Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
-#Remaining <- setdiff(Params, gsub("AUC_threshold_2402_Quant95_5step_","",
-     #                grep("2402_Quant95_5step",list.files("Genomig_Output"), value = T)))
-#save(Remaining, file = "RemainingVariables")
+Remaining <- setdiff(Params, gsub("AUC_threshold_2405_Q95_5stp_SMOTE_norm","",
+                     grep("AUC_threshold_2405_Q95_5stp_SMOTE_norm",list.files("Genomig_Output/Resampling"), value = T)))
+save(Remaining, file = "RemainingVariables_Smote")
 
-#load("RemainingVariables")
-#Params <- Remaining
-Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%20)))[[Nslice]]
+load("RemainingVariables_smote")
+Params <- Remaining
+Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%9)))[[Nslice]]
 
-#param <- "POE_BH5_L6"; comp<-"B_INV"; cross <-1
+#param <- "NC_Dlake_L5"; comp<-"B_INV"; cross <-1
 
 for(param in Params){
+  
+  print(param)
   
   RFD <- RFD_all[, c("ID",grep(paste0("B_FISH|B_INV|B_DIA|",param), colnames(RFD_all), value = T)), with = F]
   Thresholds <- seq(from = quantile(RFD[,..param], probs = 0.025, na.rm = T), 
@@ -34,7 +36,9 @@ for(param in Params){
 
   Thresh_draw <- lapply(Thresholds, function(Thresh){
     
-    #Thresh <- Thresholds[4]
+    print(Thresh)
+    
+    #Thresh <- Thresholds[1]
     
      Rfd <- RFD[get(param) > Thresh, State := "bad"][get(param) <= Thresh, State := "good"][
        , State := as.factor(State)]
@@ -50,10 +54,12 @@ for(param in Params){
          
       AUC_10Cross <- lapply(1:10, function(cross){
            
-           Train_grp <- sample(unique(Rfd_comp$ID), round(0.25*uniqueN(Rfd_comp$ID)))
-           
-           Cross_train <- Rfd_comp[ID %in% Train_grp]
-           Cross_test <- Rfd_comp[!ID %in% Train_grp]
+        Train_grp <- c(sample(unique(Rfd_comp[State == "good",ID]), round(0.3*uniqueN(Rfd_comp[State == "good",ID]))),
+                       sample(unique(Rfd_comp[State == "bad",ID]), round(0.3*uniqueN(Rfd_comp[State == "bad",ID]))))
+        
+        
+        Cross_train <- Rfd_comp[ID %in% Train_grp]
+        Cross_test <- Rfd_comp[!ID %in% Train_grp]
            
         if(uniqueN(Cross_train$State) > 1){
            
@@ -77,40 +83,40 @@ for(param in Params){
         
         Metric_Train <- confusionMatrix(predict(rf_cross, Cross_train), Cross_train$State)
         
-        return(list(AUCvalues = data.frame(Test = AUC_crossTest@y.values[[1]], Train = AUC_crossTrain@y.values[[1]]),
-                    OtherMetrics = list(ConfusionTest = Metric_Test, ConfusionTrain = Metric_Train),
-                    Model = rf_cross))
+        return(list(AUCval = data.frame(Test = AUC_crossTest@y.values[[1]], Train = AUC_crossTrain@y.values[[1]]),
+                    OtherMetrics = list(ConfusionTest = Metric_Test, ConfusionTrain = Metric_Train)))
         
         } else {return(NA)}
         
       }) 
       
-      AUC_10CrossTest <- unlist(lapply(AUC_10Cross, function(cross){return(cross[["AUCvalues"]]["Test"])}))
-      AUC_10CrossTrain <- unlist(lapply(AUC_10Cross, function(cross){return(cross[["AUCvalues"]]["Train"])}))
+      AUC_10Cross <- AUC_10Cross[which(!unlist(lapply(AUC_10Cross, function(X){anyNA(X[[1]])})))]
+      
+      AUC_10CrossTest <- unlist(lapply(AUC_10Cross, function(X){return(X[["AUCval"]]["Test"])}))
+      
+      AUC_10CrossTrain <- unlist(lapply(AUC_10Cross, function(X){return(X[["AUCval"]]["Train"])}))
+      
       
       return(list(AUCval = data.frame(AUC_valTest = mean(AUC_10CrossTest, na.rm = T),
-                        LowTest = quantile(AUC_10CrossTest, probs = 0.05, na.rm = T),
-                        UpTest = quantile(AUC_10CrossTest, probs = 0.95, na.rm = T),
-                        AUC_valTrain = mean(AUC_10CrossTrain, na.rm = T),
-                        LowTrain = quantile(AUC_10CrossTrain, probs = 0.05, na.rm = T),
-                        UpTrain = quantile(AUC_10CrossTrain, probs = 0.95, na.rm = T),
-                        Threshold = Thresh,
-                        Compartment = comp),
-                  OtherMetrics = lapply(AUC_10Cross, function(cross){return(cross[["OtherMetrics"]])}),
-                  Models = lapply(AUC_10Cross, function(cross){return(cross[["Model"]])})
-                  ))
+                                      LowTest = quantile(AUC_10CrossTest, probs = 0.05, na.rm = T),
+                                      UpTest = quantile(AUC_10CrossTest, probs = 0.95, na.rm = T),
+                                      AUC_valTrain = mean(AUC_10CrossTrain, na.rm = T),
+                                      LowTrain = quantile(AUC_10CrossTrain, probs = 0.05, na.rm = T),
+                                      UpTrain = quantile(AUC_10CrossTrain, probs = 0.95, na.rm = T),
+                                      Threshold = Thresh,
+                                      Compartment = comp),
+                  OtherMetrics = lapply(AUC_10Cross, function(cross){return(cross[["OtherMetrics"]])})
+      ))
       
     } else {return(NA)}
     
 })
-
-     Thresh_AUCval <- do.call(rbind,lapply(Thresh_AUC, function(T) return(T$AUCval)))
-     Thresh_OtherMetrics <- lapply(Thresh_AUC, function(T) return(T$OtherMetrics))
-     Thresh_Models <- lapply(Thresh_AUC, function(T) return(T$Models))
+     Thresh_AUC <- Thresh_AUC[which(unlist(lapply(Thresh_AUC, length))==2)]
+     Thresh_AUCval <- do.call(rbind,lapply(Thresh_AUC, function(Tr) return(Tr$AUCval)))
+     Thresh_OtherMetrics <- lapply(Thresh_AUC, function(Tr) return(Tr$OtherMetrics))
      
      return(list(Thresh_AUCval = Thresh_AUCval,
-                 Thresh_OtherMetrics = Thresh_OtherMetrics,
-                 Thresh_Models = Thresh_Models))
+                 Thresh_OtherMetrics = Thresh_OtherMetrics))
 })
 
 
@@ -133,12 +139,13 @@ ggplot(data = Thresh_plot[complete.cases(Thresh_plot),], aes(x = Threshold, y = 
   
 #####
 # Get threshold ranges
-load("HYMOBIO_FULLDATA_202401.RData")
+load("../HYMOBIO_FULLDATA_202405.RData")
 
-Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
+Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
 
 Thresholds <- as.data.table(do.call(rbind,lapply(Params, function(param){
+  print(param)
   
   RFD <- RFD_all[, ..param]
   ret <- tryCatch({seq(from = quantile(RFD[,..param], probs = 0.025, na.rm = T), 

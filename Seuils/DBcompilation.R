@@ -37,7 +37,7 @@ Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 
 RFD_all <- RFD_all[, c("ID","Year",grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T)), with = F]
 RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
-save(RFD_all, file = "../HYMOBIO_FULLDATA_202403.RData")
+save(RFD_all, file = "../HYMOBIO_FULLDATA_202405.RData")
 rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"))
 
 
@@ -86,5 +86,16 @@ Count <- do.call(rbind,lapply(c("Fish", "Macroinvertebrate", "Diatom"), function
                     Nfunct = length(grep(paste0("B_", code, "_"),colnames(get(paste0("DiversityFunctional_", comp))))),
                     Compartment = comp))
 }))
+
+
+##PC data
+
+CatalogPC <- fread("../MetricsCatalogue_PCcomplet.csv")[which(TokeepThreshold)]
+CatalogPC[grep("_ALL", NameOrigin), TokeepThreshold := TRUE]
+write.table(CatalogPC, file = "../MetricsCatalogue_PCcomplet.csv", sep = ";", row.names = F)
+
+
+
+
 
 

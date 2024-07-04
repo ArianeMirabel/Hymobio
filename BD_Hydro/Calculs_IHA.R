@@ -23,6 +23,7 @@ load("Hydro_BioInventories_correspondance")
 # Amplitude measure, based on EflowStats functions
 Amplitude <- function(x){
   
+  # Retirer d'abord l'effet saison en "faisant la différence avec la moyenne mensuelle
   x[, Deseas := (resultat_obs_elab - mean(resultat_obs_elab)), by = "month"][
     , Deseas := (Deseas - mean(Deseas)) / sd(Deseas)][
     , corrAR1 := round(ar(Deseas, aic = FALSE, order.max = 1, method = "yule-walker")$ar, 2)]
@@ -30,6 +31,7 @@ Amplitude <- function(x){
   jday <- lubridate::yday(x$date_obs_elab)
   dec.year <- as.numeric(x$year) + (jday/365.25)
   
+  # Formule de l'amplitude
   scaled <- (x$resultat_obs_elab - mean(x$resultat_obs_elab)) / sd(x$resultat_obs_elab)
   x_mat = cbind(1, sin(2 * pi * dec.year), cos(2 * pi * dec.year))
   mod <- .lm.fit(x_mat, scaled)
@@ -51,6 +53,7 @@ CountPeriods <- function(Q, module, dates, type, threshold = 7){
   
   if(is.na(unique(module))){ return(NA) }
   
+  # On définit si on regarde un étiage (basse eaux) ou une crue (hautes eaux)
   ifelse(type == "etiage", 
                 ret <- data.table(dates = dates[which(Q <= module)]), 
                 ret <- data.table(dates = dates[which(Q  >= module)]))
@@ -58,7 +61,8 @@ CountPeriods <- function(Q, module, dates, type, threshold = 7){
   ret <- ret[order(dates)][, Run_period := 1][
     , Date_check := seq.Date(from = first(dates), length.out = length(dates), by = "days")-dates]
   
-  while(any(ret[, Date_check] < -threshold )){ret[Date_check != 0 & Date_check > -threshold, dates := 
+  # On veut compter une seule période extrême quelle que soit sa durée
+  while(any(ret[, Date_check] < -threshold )){ ret[Date_check != 0 & Date_check > -threshold, dates := 
         seq.Date(from = first(dates), length.out = length(dates), by = "days")][Date_check != 0 & Date_check > -threshold, 
         Date_check := seq.Date(from = first(dates), length.out = length(dates), by = "days")-dates][
           Date_check < -threshold,  c("Run_period", "Date_check") := list(Run_period + 1, 
@@ -69,6 +73,7 @@ CountPeriods <- function(Q, module, dates, type, threshold = 7){
 }
 
 # Measure IHA for the sampling dates, for the given time steps
+#On mesure les indices sur un pas de temps défini par Tstep (si >12 on passe en année) à partir de la date de prélèvement
 Index_timestep <- function(Tstep, Hydro_Serie, Station, Sampling_Date, Tol_threshold){
   
   if (Tstep > 12){Tstep <- time_length(years(Tstep/10), unit = "months")}
@@ -84,6 +89,7 @@ Hydro_serie <- merge(Hydro_Serie, Sampling_Date, by = "Date")
 
 if(nrow(Hydro_serie) == 0) {return(NA)}
 
+#on ne veut calculer l'indice que si on a suffisament de données sur la période (un pourcentage défini par Tol_threshold)
 Hydro_serie[, Tcover:= uniqueN(Date)/length(seq.Date(from = unique(Start), to = unique(Samp_date), by = 'day')), by = "period"]
 Hydro_serie <- Hydro_serie[Tcover >= Tol_threshold][,Tcover := NULL]
 Hydro_serie <- Hydro_serie[, c("count", "unique") := list(.N, uniqueN(resultat_obs_elab)), by = "period"][
@@ -97,6 +103,7 @@ if(nrow(Hydro_serie) == 0) {return(NA)}
      if(nrow(Hydro_serie) == 0) {return(NA)}
     Hydro_serie = Hydro_serie[, c("period", "Samp_date", "Start") := list(0, NA_Date_, NA_Date_)]}
 
+  #Ces 4 moments viennent directement de la fonction Lmoments
 Hydro_serie[, c("Lmean", "Lscale", "Lskew", "Lkurt") := as.list(lmoms(resultat_obs_elab, nmom = 4)$ratios[1:4]), by = "period"][
   , Lmean := mean(resultat_obs_elab), by = "period"]
 
@@ -110,6 +117,7 @@ Ampli <- do.call(rbind,lapply(unique(Hydro_serie$period), function(ti){
 
 Hydro_serie <- merge(Hydro_serie, Ampli, by = "period")
 
+#Si on veut toute la série de données, on prend Tstep == 0. Les étiages et crues ne sont comptés que pour la série entière
 if(Tstep == 0){
   Tstep <- "all"
   
@@ -149,9 +157,11 @@ return(Hydro_serie)
 
 #rm(list=setdiff(ls(), c("Correspondance_station", "Hydro_journaliere")))
 
+#On définit le taux de complétude minimum des donénes, et les pas de temps à considérer
 tol_threshold <- 0.75
 laps <- c(3,6,12,50,0)
 
+# On fait le calcul par station hydro
 Hydrolaps <- lapply(unique(Correspondance_station[, ID_AMOBIO_START]), function(stationBio){
   
   pb <- txtProgressBar(min = 0, max = uniqueN(Correspondance_station[, ID_AMOBIO_START]), style = 3)

@@ -5,32 +5,24 @@ ls -lai
 chmod 777 -R *
 find . -type f \( -iname "*.R" \) -exec dos2unix {} +
 
-  nohup ./RFthresholds_Bash1.R &
-  nohup ./RFthresholds_Bash2.R &
-  nohup ./RFthresholds_Bash3.R &
-  nohup ./RFthresholds_Bash4.R &
-  nohup ./RFthresholds_Bash5.R &
-  nohup ./RFthresholds_Bash6.R &
-  nohup ./RFthresholds_Bash7.R &
-  nohup ./RFthresholds_Bash8.R &
-  nohup ./RFthresholds_Bash9.R &
-  nohup ./RFthresholds_Bash10.R &
-  nohup ./RFthresholds_Bash11.R &
-  nohup ./RFthresholds_Bash12.R &
-  nohup ./RFthresholds_Bash13.R &
-  nohup ./RFthresholds_Bash14.R &
-  nohup ./RFthresholds_Bash15.R &
-  nohup ./RFthresholds_Bash16.R &
-  nohup ./RFthresholds_Bash17.R &
-  nohup ./RFthresholds_Bash18.R &
-  nohup ./RFthresholds_Bash19.R &
-  nohup ./RFthresholds_Bash20.R &
-  nohup ./RFthresholds_Bash21.R &
-  nohup ./RFthresholds_Bash22.R&
-  nohup ./RFthresholds_Bash23.R &
-  nohup ./RFthresholds_Bash24.R &
-  nohup ./RFthresholds_Bash25.R &
-  nohup ./RFthresholds_Bash26.R
+  nohup ./RFthresholds_smote_Bash1.R &
+  nohup ./RFthresholds_smote_Bash2.R &
+  nohup ./RFthresholds_smote_Bash3.R &
+  nohup ./RFthresholds_smote_Bash4.R &
+  nohup ./RFthresholds_smote_Bash5.R &
+  nohup ./RFthresholds_smote_Bash6.R &
+  nohup ./RFthresholds_smote_Bash7.R &
+  nohup ./RFthresholds_smote_Bash8.R &
+  nohup ./RFthresholds_smote_Bash9.R &
+  nohup ./RFthresholds_smote_Bash10.R &
+  nohup ./RFthresholds_smote_Bash11.R &
+  nohup ./RFthresholds_smote_Bash12.R &
+  nohup ./RFthresholds_smote_Bash13.R &
+  nohup ./RFthresholds_smote_Bash14.R &
+  nohup ./RFthresholds_smote_Bash15.R &
+  nohup ./RFthresholds_smote_Bash16.R &
+  nohup ./RFthresholds_smote_Bash17.R &
+  nohup ./RFthresholds_smote_Bash18.R
   
 ctrl Z => stop stuff
 bg

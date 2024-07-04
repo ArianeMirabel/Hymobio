@@ -4,11 +4,11 @@ invisible(lapply(c("data.table", "rgdal", "sf", "ggplot2"),function(pk){
 
 setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
 
-load("../HYMOBIO_FULLDATA_202403.RData")
+load("../HYMOBIO_FULLDATA_202405.RData")
 
 load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/AllStation_ArianeMarch2023")
 
-CompartmentCols <- c("Fish" = "cornflowerblue", "Macroinvertebrate" = "tan2", "Diatom" = "chartreuse4")
+CompartmentCols <- c("Fish" = "cornflowerblue", "Macroinvertebrates" = "tan2", "Diatoms" = "chartreuse4")
 
 AllStations <- AllStations[CdStation %in% RFD_all$ID]
 

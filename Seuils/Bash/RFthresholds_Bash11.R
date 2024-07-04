@@ -1,15 +1,20 @@
 #!/usr/bin/Rscript 
-invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel", "dplyr"),function(pk){
+invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel", "dplyr","caret"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
 Nslice <- 11
 
-load("HYMOBIO_FULLDATA_202403.RData")
+load("HYMOBIO_FULLDATA_202405.RData")
 
 Catalog <- fread("MetricsCatalogue.csv")[which(TokeepThreshold)]
 Params <- grep(paste(Catalog$NameOrigin, collapse = "|"), colnames(RFD_all), value = "T")
+
+#load("RemainingVariables")
+#Params <- Remaining
 Params <- split(Params, ceiling(seq_along(Params)/(length(Params)%/%15)))[[Nslice]]
+
+
 
 for(param in Params){
   
@@ -38,20 +43,21 @@ for(param in Params){
         
         AUC_10Cross <- lapply(1:10, function(cross){
           
-          Train_grp <- sample(unique(Rfd_comp$ID), round(0.25*uniqueN(Rfd_comp$ID)))
+          Train_grp <- c(sample(unique(Rfd_comp[State == "good",ID]), round(0.3*uniqueN(Rfd_comp[State == "good",ID]))),
+                           sample(unique(Rfd_comp[State == "bad",ID]), round(0.3*uniqueN(Rfd_comp[State == "bad",ID]))))
+          
           
           Cross_train <- Rfd_comp[ID %in% Train_grp]
           Cross_test <- Rfd_comp[!ID %in% Train_grp]
           
-          if(uniqueN(Cross_train$State) > 1){
-            
             rf_cross <- tryCatch({randomForest(State ~ .,
                                                data = Cross_train[, grep(paste0(comp,"|State"), colnames(Rfd_comp), value = T), with = F],
                                                scale.permutation.importance = TRUE,
                                                respect.unordered.factors = TRUE, ntree = 150,
-                                               mtry = 100, nodesize = nrow(Cross_train)*0.005                                               )},
+                                               mtry = 100, nodesize = nrow(Cross_train)*0.005)},
                                  warning = function(w) {print(paste(w, "Cross val on threshold", Thresh, "for", param))},
                                  error = function(e) {print(paste(e, "Cross val on threshold", Thresh, "for", param))})
+            
             AUC_crossTest <- performance(prediction(
               as.numeric(predict(rf_cross, 
                                  Cross_test)), Cross_test$State),"auc")
@@ -64,16 +70,17 @@ for(param in Params){
             
             Metric_Train <- confusionMatrix(predict(rf_cross, Cross_train), Cross_train$State)
             
-            return(list(AUCvalues = data.frame(Test = AUC_crossTest@y.values[[1]], Train = AUC_crossTrain@y.values[[1]]),
-                        OtherMetrics = list(ConfusionTest = Metric_Test, ConfusionTrain = Metric_Train),
-                        Model = rf_cross))
+            return(list(AUCval = data.frame(Test = AUC_crossTest@y.values[[1]], Train = AUC_crossTrain@y.values[[1]]),
+                        OtherMetrics = list(ConfusionTest = Metric_Test, ConfusionTrain = Metric_Train)))
             
-          } else {return(NA)}
           
         }) 
         
-        AUC_10CrossTest <- unlist(lapply(AUC_10Cross, function(cross){return(cross[["AUCvalues"]]["Test"])}))
-        AUC_10CrossTrain <- unlist(lapply(AUC_10Cross, function(cross){return(cross[["AUCvalues"]]["Train"])}))
+        AUC_10Cross <- AUC_10Cross[which(!unlist(lapply(AUC_10Cross, function(X){anyNA(X[[1]])})))]
+        
+        AUC_10CrossTest <- unlist(lapply(AUC_10Cross, function(X){return(X[["AUCval"]]["Test"])}))
+        
+        AUC_10CrossTrain <- unlist(lapply(AUC_10Cross, function(X){return(X[["AUCval"]]["Train"])}))
         
         return(list(AUCval = data.frame(AUC_valTest = mean(AUC_10CrossTest, na.rm = T),
                                         LowTest = quantile(AUC_10CrossTest, probs = 0.05, na.rm = T),
@@ -83,23 +90,21 @@ for(param in Params){
                                         UpTrain = quantile(AUC_10CrossTrain, probs = 0.95, na.rm = T),
                                         Threshold = Thresh,
                                         Compartment = comp),
-                    OtherMetrics = lapply(AUC_10Cross, function(cross){return(cross[["OtherMetrics"]])}),
-                    Models = lapply(AUC_10Cross, function(cross){return(cross[["Model"]])})
+                    OtherMetrics = lapply(AUC_10Cross, function(cross){return(cross[["OtherMetrics"]])})
         ))
         
       } else {return(NA)}
       
     })
     
+    Thresh_AUC <- Thresh_AUC[which(unlist(lapply(Thresh_AUC, length))==2)]
     Thresh_AUCval <- do.call(rbind,lapply(Thresh_AUC, function(T) return(T$AUCval)))
     Thresh_OtherMetrics <- lapply(Thresh_AUC, function(T) return(T$OtherMetrics))
-    Thresh_Models <- lapply(Thresh_AUC, function(T) return(T$Models))
     
     return(list(Thresh_AUCval = Thresh_AUCval,
-                Thresh_OtherMetrics = Thresh_OtherMetrics,
-                Thresh_Models = Thresh_Models))
+                Thresh_OtherMetrics = Thresh_OtherMetrics))
     
   })
   
-  save(Thresh_draw, file = paste0("AUC_threshold_2404_Quant95_5step_", param))
+  save(Thresh_draw, file = paste0("AUC_threshold_2405_Quant95_5step_", param))
 }
