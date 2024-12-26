@@ -2,7 +2,7 @@ invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest",
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
+setwd("D:/Mes Donnees/Hymobio/DataBase_treatment/Seuils")
 
 Catalog <- fread("MetricsCatalogue.csv")[which(Tokeep)]
 
@@ -119,6 +119,3 @@ ggplot(data = Thresh_plot[complete.cases(Thresh_plot),], aes(x = Threshold, y = 
               color = "white", fill = "olivedrab", alpha = 0.3)
   
   
-  
-
-

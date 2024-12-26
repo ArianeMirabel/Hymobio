@@ -2,11 +2,11 @@ invisible(lapply(c("data.table", "rgdal", "sf", "ggplot2"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
+setwd("D:/Mes Donnees/Hymobio/DataBase_treatment/Seuils")
 
 load("../HYMOBIO_FULLDATA_202405.RData")
 
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/AllStation_ArianeMarch2023")
+load("D:/Mes Donnees/Hymobio/DataBase_treatment/BD_Bio/AllStation_ArianeMarch2023")
 
 CompartmentCols <- c("Fish" = "cornflowerblue", "Macroinvertebrates" = "tan2", "Diatoms" = "chartreuse4")
 

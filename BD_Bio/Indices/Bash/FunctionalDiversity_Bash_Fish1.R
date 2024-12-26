@@ -4,7 +4,7 @@ source("FunctionalDiversity_Functions_Bash.R")
 load("SELECTION_STATION_list_station_filter5_metadata_20230525.Rdata")
 
 directory <- paste0(getwd(), "/FinalMAJ_Naiades.Alric.Traits/")
-compartment <- "Fish"
+compartment <- "Diatom"
 slice <- 1
 
 

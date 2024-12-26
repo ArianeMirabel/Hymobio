@@ -1,15 +1,15 @@
-invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel", "dplyr"),function(pk){
+invisible(lapply(c("data.table", "ggplot2", "stringr", "ggpubr", "randomForest", "ROCR", "doParallel", "dplyr", "randomForestExplainer"),function(pk){
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
+setwd("D:/Mes Donnees/Hymobio/DataBase_treatment/Seuils")
 
 load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20231123.Rdata")
 RFD_all <- as.data.table(MATRIX_AMOBIO_WP3_CLEAN)[, H_Ncrue_S1_ALL := NULL]
 RFD_all[,grep("B_INV|B_FISH|B_DIA", colnames(RFD_all), value = T) := NULL]
 RFD_all[, Year := as.character(format(DATE_OPERATION, format = "%Y"))]
 
-directory <- "C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/"
+directory <- "D:/Mes Donnees/Hymobio/DataBase_treatment/BD_Bio/Indices/Genomig_Output/"
 lapply(paste0(directory,
     grep("DiversityFunctional_2401|DiversityTaxonomic_2401",list.files(directory), value =T)),
     load, .GlobalEnv)
@@ -22,7 +22,7 @@ for(compartment in c("Fish", "Macroinvertebrate", "Diatom")) {
 }
 
 
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Hydro/HydroIndex_36125all_AM_20232911")
+load("D:/Mes Donnees/Hymobio/DataBase_treatment/BD_Hydro/HydroIndex_36125all_AM_20232911")
 RFD_all <- left_join(RFD_all, Hydrolaps[, ID := sub('.*_', '', ID_AMOBIO_START)][, COMPARTMENT := sub('_.*', '', ID_AMOBIO_START)][
   , c("ID", "ID_AMOBIO_START", "COMPARTMENT", "Samp_date", grep("Ncrues|Netiage", colnames(Hydrolaps), value = T)), with = F],
   by = c("ID" = "ID", "DATE_OPERATION" = "Samp_date", "COMPARTMENT" = "COMPARTMENT"))
@@ -37,12 +37,16 @@ Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
 
 RFD_all <- RFD_all[, c("ID","Year",grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T)), with = F]
 RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
+
 save(RFD_all, file = "../HYMOBIO_FULLDATA_202405.RData")
 rm(list= c("MATRIX_AMOBIO_WP3_CLEAN", "Hydrolaps"))
 
 
 load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20240212.RData")
 RFD_all[COMPARTMENT == "FISH" & !is.na(B_FISH_Richness),grep("B_FISH|ID|Year", colnames(RFD_all), value = T), with = F ]
+
+
+
 
 Count <- do.call(rbind,lapply(c("FISH", "INV", "DIA"), function(comp){
 return(data.frame(Nsites = RFD_all[grep(comp,COMPARTMENT)][!is.na(get(paste0("B_",comp,"_Richness"))), uniqueN(ID)],
@@ -95,6 +99,46 @@ CatalogPC[grep("_ALL", NameOrigin), TokeepThreshold := TRUE]
 write.table(CatalogPC, file = "../MetricsCatalogue_PCcomplet.csv", sep = ";", row.names = F)
 
 
+#####
+
+#Stats pour nombre d'obs par catégorie
+######
+setwd("D:/Mes Donnees/Hymobio/DataBase_treatment/Seuils")
+load("AMOBIO_WP3_2_FISH_INV_DIA_ENTROPIE_20240212.RData")
+load("../HYMOBIO_FULLDATA_202405.RData")
+
+Catalog <- fread("../MetricsCatalogue.csv")[which(TokeepThreshold)]
+
+RFD_all <- RFD_all[, c("ID","Year",grep(paste0("B_FISH|B_INV|B_DIA|",paste(Catalog$NameOrigin, collapse = "|")), colnames(RFD_all), value = T)), with = F]
+RFD_all <- RFD_all[, lapply(.SD, function(X) {X[X == "-Inf"] <- NA; return (X)})]
+
+Catalog <- Catalog[Name_Origine %in% colnames(RFD_all)]
+
+table(Catalog$Category)
+
+Nobs <- unlist(lapply(unique(Catalog$Category), function(cat){
+  Stats <- RFD_all[, c("ID", unique(Catalog[Category == cat, Name_Origine])), with = F]
+  #return(uniqueN(Stats[complete.cases(Stats[,!"ID"]), ID]))
+  return(uniqueN(Stats[which(apply(Stats[,!"ID"],1,function(R){any(!is.na(R))})), ID]))
+})
+)
+names(Nobs) <- unique(Catalog$Category)
+
+
+Nperiod <- unlist(lapply(unique(Catalog$Category), function(cat){
+  Stats <- RFD_all[, c("ID","Year", unique(Catalog[Category == cat, Name_Origine])), with = F]
+  Stats <- Stats[which(apply(Stats[,!"ID"][,!"Year"],1,function(R){any(!is.na(R))})), ]
+  return(paste(range(Stats[,Year]), collapse = "-"))
+})
+)
+names(Nperiod) <- unique(Catalog$Category)
+
+
+Ncomb <- unlist(lapply(unique(Catalog$Category), function(cat){
+  return(uniqueN(Catalog[Category == cat, NameOrigin]))
+})
+)
+names(Ncomb) <- unique(Catalog$Category)
 
 
 

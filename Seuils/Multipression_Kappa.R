@@ -2,13 +2,13 @@ invisible(lapply(c("data.table", "psych", "sf", "ggplot2","ggpubr", "scales"),fu
   if(!pk %in% row.names(installed.packages())){install.packages(pk)}
   library(pk,character.only=T)}))
 
-setwd("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils")
+setwd("D:/Mes Donnees/Hymobio/DataBase_treatment/Seuils")
 
 load("../HYMOBIO_FULLDATA_202405.RData")
 
-files <- list.files("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/Seuils/Genomig_Output")
+files <- list.files("D:/Mes Donnees/Hymobio/DataBase_treatment/Seuils/Genomig_Output")
 Catalog <- fread("../MetricsCatalogue.csv")#[DegradationDirection != 0]
-toremove <- "AUC_threshold_2404_Quant95_5step_"
+toremove <- "AUC_threshold_2405_Quant95_5step_"
 Titles <- fread("SumUp_Seuil.csv")
 Titles[, Reference_Threshold := as.numeric(gsub(",",".", Reference_Threshold))]
 
@@ -19,10 +19,14 @@ files <- gsub(toremove, "", files)
 
 RFD <- RFD_all[,c("ID", "Year",grep(paste(files,collapse = "|"),colnames(RFD_all),value = T)),with = F]
 #####
+load("FinalTable")
+
+files <- Table[AUC_valTest >= 0.7 & F1 >= 0.7 & DegradationDirection != 0, Name_Origine]
 
 Qualificate_Samples <- function(RFD_sample, Files){
   
   RFD_return <- lapply(Files, function(param){
+    print(param)
   
   load(paste0(getwd(),"/Genomig_Output/", toremove, param))
     
@@ -30,48 +34,52 @@ Qualificate_Samples <- function(RFD_sample, Files){
     
   if(any(unlist(lapply(Thresh_draw, is.data.frame)))){
     
-    Thresh_plot <- Thresh_draw[unlist(lapply(Thresh_draw, is.data.frame))]
+    #Thresh_plot <- Thresh_draw[unlist(lapply(Thresh_draw, is.data.frame))]
     
-  Thresh_plot <- as.data.table(do.call(rbind,lapply(Thresh_plot, function(x) {
+  #Thresh_plot <- as.data.table(do.call(rbind,lapply(Thresh_plot, function(x) {
     
-    x$Threshold <- unique(x$Threshold)[!is.na(unique(x$Threshold))]
+    #x$Threshold <- unique(x$Threshold)[!is.na(unique(x$Threshold))]
     
-    x <- as.data.table(x)[, grep(c("AUC_val|Low|Up|Threshold"), colnames(x), value = T) := 
-                            lapply(.SD, function(col){return(round(as.numeric(col), 2))}), 
-                          .SDcols = grep(c("AUC_val|Low|Up|Threshold"), colnames(x), value = T)]
+    #x <- as.data.table(x)[, grep(c("AUC_val|Low|Up|Threshold"), colnames(x), value = T) := 
+    #                        lapply(.SD, function(col){return(round(as.numeric(col), 2))}), 
+    #                      .SDcols = grep(c("AUC_val|Low|Up|Threshold"), colnames(x), value = T)]
     
-    x <- merge(x, data.table(Compartment = c("B_FISH", "B_INV", "B_DIA"),
-                             CompartmentName = c("Fish", "Macroinvertebrate", "Diatom")), all.y = T)
-    return(x)})))[
-      , CompartmentName := factor(CompartmentName, levels = c("Fish", "Macroinvertebrate", "Diatom"))][
-        , N := length(which(!is.na(AUC_valTest))), by = CompartmentName]
+    #x <- merge(x, data.table(Compartment = c("B_FISH", "B_INV", "B_DIA"),
+    #                         CompartmentName = c("Fish", "Macroinvertebrate", "Diatom")), all.y = T)
+   # return(x)})))[
+    #  , CompartmentName := factor(CompartmentName, levels = c("Fish", "Macroinvertebrate", "Diatom"))][
+     #   , N := length(which(!is.na(AUC_valTest))), by = CompartmentName]
   
-  Thresh_max <- unique(Thresh_plot[, c("AUCmaxTest","THRmaxTest") := list(max(AUC_valTest, na.rm = T),
-                                                                          Threshold[which.max(AUC_valTest)]), by = CompartmentName][
-                                                                            ,.(CompartmentName, AUCmaxTest, THRmaxTest)])
-  Thresh_max[Thresh_max==-Inf] <- NA
+ # Thresh_max <- unique(Thresh_plot[, c("AUCmaxTest","THRmaxTest") := list(max(AUC_valTest, na.rm = T),
+  #                                                                        Threshold[which.max(AUC_valTest)]), by = CompartmentName][
+   #                                                                         ,.(CompartmentName, AUCmaxTest, THRmaxTest)])
+  #Thresh_max[Thresh_max==-Inf] <- NA
   
-  if(any(Thresh_max$AUCmaxTest >= 0.5)){
+    Thresh_max <- Table[Name_Origine == param] 
+    
+  #if(any(Thresh_max$AUCmaxTest >= 0.5)){
+    if(Thresh_max[,AUC_valTest] >= 0.7){
     Dir <- Catalog[NameOrigin == param, DegradationDirection]
     
-    Threshold <- Thresh_max[, ifelse(Dir > 0, min(THRmaxTest), max(THRmaxTest))]
+    Threshold <- Thresh_max[, ifelse(Dir > 0, min(Threshold, THRintersect), max(Threshold, THRintersect))]
     
     ret <- RFD_sample[, param, with = F]
-    #ret[!is.na(get(param)), paste0("State_", param) := "good"]
-    ret[!is.na(get(param)), paste0("State_", param) := max(Thresh_max$AUCmaxTest)]
-    
-    #if(Dir > 0){ 
-     # ret[get(param) >= Threshold, paste0("State_", param) := "bad"]
-    #} else {ret[get(param) <= Threshold, paste0("State_", param) := "bad"]}
+    ret[!is.na(get(param)), paste0("State_", param) := "good"]
+    #ret[!is.na(get(param)), paste0("State_", param) := max(Thresh_max$AUC_valTest)]
     
     if(Dir > 0){ 
-      ret[get(param) >= Threshold, paste0("State_", param) := -max(Thresh_max$AUCmaxTest)]
-    } else {ret[get(param) <= Threshold, paste0("State_", param) := -max(Thresh_max$AUCmaxTest)]}
+      ret[get(param) >= Threshold, paste0("State_", param) := "bad"]
+    } else {ret[get(param) <= Threshold, paste0("State_", param) := "bad"]}
     
-  } else {ret <- RFD_sample[, param, with = F][!is.na(get(param)), paste0("State_", param) := NA][
-    , paste0("AUC_", param) := max(Thresh_max$AUCmaxTest)]}
-  
+    #if(Dir > 0){ 
+     # ret[get(param) >= Threshold, paste0("State_", param) := -max(Thresh_max$AUCmaxTest)]
+    #} else {ret[get(param) <= Threshold, paste0("State_", param) := -max(Thresh_max$AUCmaxTest)]}
+    
   return(ret)
+  }
+    #else {ret <- RFD_sample[, param, with = F][!is.na(get(param)), paste0("State_", param) := NA][
+    #, paste0("AUC_", param) := max(Thresh_max$AUCmaxTest)]}
+  
   
  # return(list(DirMat = ret,
   #            AUC = data.table(AUC = max(Thresh_max$AUCmaxTest), Var = param)))
@@ -129,7 +137,7 @@ ggplot(Pkappa, aes(x= Description, y = estimate, color = Category)) +
 
 
 #####
-load("C:/Users/armirabel/Documents/INRAE/Hymobio/DataBase_treatment/BD_Bio/AllStation_ArianeMarch2023")
+load("D:/Mes Donnees/Hymobio/DataBase_treatment/BD_Bio/AllStation_ArianeMarch2023")
 load("BioState_save")
 Titles <- fread("SumUp_Seuil.csv")
 BioStateMap <- merge(BioState, unique(AllStations[,.(CdStation, CoordX_L93, CoordY_L93)]), 
@@ -139,37 +147,37 @@ BioStateMap <- BioStateMap[, c(c("ID", "CoordX_L93", "CoordY_L93"),
                   colnames(BioStateMap), value = T)), with = F]
 
   
-#BioStateMap_bads <- BioStateMap[, "PC_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
- #                                         .SDcols = patterns('State_PC_'), by = 'ID'][
-#                               , "NC_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
-#                                         .SDcols = patterns('State_NC_'), by = 'ID'][
-#                               , "POE_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
-#                                         .SDcols = patterns('State_POE_'), by = 'ID'][
-#                               , "T_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
-#                                         .SDcols = patterns('State_T_'), by = 'ID'][
-#                               , "HM_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
-#                                         .SDcols = patterns('State_HM_'), by = 'ID'][
-#                               , "P_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
-#                                         .SDcols = patterns('State_P_'), by = 'ID'][
-#                               , "H_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
-#                                         .SDcols = patterns('State_H_'), by = 'ID'][
-#                               , "Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))),
-#                                         .SDcols = patterns('State'), by = 'ID']
+BioStateMap_bads <- BioStateMap[, "PC_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                         .SDcols = patterns('State_PC_'), by = 'ID'][
+                               , "NC_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                         .SDcols = patterns('State_NC_'), by = 'ID'][
+                               , "POE_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                         .SDcols = patterns('State_POE_'), by = 'ID'][
+                               , "T_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                         .SDcols = patterns('State_T_'), by = 'ID'][
+                               #, "HM_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                #         .SDcols = patterns('State_HM_'), by = 'ID'][
+                               , "P_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                         .SDcols = patterns('State_P_'), by = 'ID'][
+                               #, "H_Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))), 
+                                #         .SDcols = patterns('State_H_'), by = 'ID'][
+                               , "Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))),
+                                         .SDcols = patterns('State'), by = 'ID']
 
-BioStateMap_bads <- BioStateMap[, "PC_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_PC_'), by = 'ID'][
-  , "NC_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_NC_'), by = 'ID'][
-  , "POE_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_POE_'), by = 'ID'][
-  , "T_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_T_'), by = 'ID'][
-  , "HM_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_HM_'), by = 'ID'][
-  , "P_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_P_'), by = 'ID'][
-  , "H_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_H_'), by = 'ID'][
-  , "Bads" := -sum(.SD, na.rm = T),.SDcols = patterns('State'), by = 'ID']
+#BioStateMap_bads <- BioStateMap[, "PC_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_PC_'), by = 'ID'][
+#  , "NC_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_NC_'), by = 'ID'][
+#  , "POE_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_POE_'), by = 'ID'][
+#  , "T_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_T_'), by = 'ID'][
+#  , "HM_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_HM_'), by = 'ID'][
+#  , "P_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_P_'), by = 'ID'][
+#  , "H_Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State_H_'), by = 'ID'][
+#  , "Bads" := -sum(.SD, na.rm = T),.SDcols = patterns('State'), by = 'ID']
                                 
 
-#BioStateMap_toplot <- BioStateMap[, "Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))),
- # .SDcols = patterns('State'), by = 'ID']
+BioStateMap_toplot <- BioStateMap[, "Bads" := length(which(.SD == "bad"))/length(which(!is.na(.SD))),
+ .SDcols = patterns('State'), by = 'ID']
 
-BioStateMap_toplot <- BioStateMap[, "Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State'), by = 'ID']
+#BioStateMap_toplot <- BioStateMap[, "Bads" := -sum(.SD, na.rm = T), .SDcols = patterns('State'), by = 'ID']
 
 BioStateMap_tofacet <- BioStateMap_bads[ , c("ID", "CoordX_L93", "CoordY_L93", 
                                            grep("Bads", colnames(BioStateMap_bads), value = T)), with = F]
@@ -197,25 +205,27 @@ BioStateMap_tofacet[Category == "PC", Category := "Physico-chemistry"][Category 
 
 Plot_cat <- 
   
-  ggplot() +  
-  geom_sf(data = FrenchOutline, fill="white", color="black") +
+  ggplot(data = FrenchOutline) +  
+  geom_sf(fill="white", color="gray") +
   geom_point(data = BioStateMap_tofacet[Category != 'All variables'], aes(x = CoordX_L93, y = CoordY_L93, color = Bads), size = 1) +
-  scale_color_gradient2(low = "cornflowerblue", mid = "snow2",high = "firebrick",
-                       limits = c(-10,10), oob=squish, name = "Biological state",
-                       breaks = c(-5,0,5), labels = c("Least impacted", "", "Most impacted")) + 
+  scale_colour_distiller(#low = "cornflowerblue", mid = "snow2",high = "firebrick",  midpoint = 0.5, oob=squish, 
+    na.value = NA, palette = "YlOrRd", direction = 1,
+    name = "Biological state\n", breaks = c(0,0.5,1), limits = c(0,1), 
+    labels = c("Least impacted", "", "Most impacted")) + 
   facet_wrap(Category ~ ., ncol = 4) + theme_void() +
-  ggtitle("(B)")
+  ggtitle("(B)") + theme(plot.title = element_text(hjust = 0))
 
 
 Plot_All <-
   
-  ggplot() +  
-  geom_sf(data = FrenchOutline, fill="white", color="black") +
+  ggplot(data = FrenchOutline) +  
+  geom_sf( fill="white", color="gray") +
   geom_point(data = BioStateMap_toplot, aes(x = CoordX_L93, y = CoordY_L93, colour = Bads), size = 1) +
-  scale_color_gradient2(low = "cornflowerblue", mid = "snow2",high = "firebrick",
-                        limits = c(-10,10), oob=squish, name = "Biological state",
-                        breaks = c(-5,0,5), labels = c("Least impacted", "", "Most impacted")) + 
-  theme_void() +
+  scale_colour_distiller(#low = "cornflowerblue", mid = "snow2",high = "firebrick",  midpoint = 0.5, oob=squish, 
+                        na.value = NA, palette = "YlOrRd", direction = 1,
+                        name = "Biological state\n", breaks = c(0,0.5,1), limits = c(0,1), 
+                        labels = c("Least impacted", "", "Most impacted")) + 
+  theme_void() + theme(plot.title = element_text(hjust = 0)) +
   ggtitle("(A) Main biological state regarding detected thresholds", subtitle = "All variables")
 
 ggarrange(Plot_All,Plot_cat,  nrow = 2, common.legend = T, legend = "right")
